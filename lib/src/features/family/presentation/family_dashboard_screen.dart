@@ -9,6 +9,7 @@ import '../../members/domain/member.dart';
 import '../../members/presentation/widgets/member_avatar.dart';
 import '../../tree/application/tree_providers.dart';
 import '../application/family_providers.dart';
+import '../application/realtime_provider.dart';
 import '../domain/family.dart';
 
 /// The signed-in landing screen for a family: stats, members, and entry to the
@@ -23,6 +24,9 @@ class FamilyDashboardScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final theme = Theme.of(context);
+    // Keep a live Realtime subscription open while the dashboard is visible so
+    // changes from other relatives appear without a manual refresh.
+    ref.watch(familyRealtimeProvider(family.id));
     final membersAsync = ref.watch(membersProvider(family.id));
 
     return Scaffold(
