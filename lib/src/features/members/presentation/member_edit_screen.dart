@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../family/application/family_providers.dart';
@@ -39,6 +42,10 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
   DateTime? _birthDate;
   DateTime? _deathDate;
 
+  /// Newly-picked photo bytes (not yet uploaded), and the existing photo URL.
+  Uint8List? _pickedBytes;
+  String? _photoUrl;
+
   _LinkKind _linkKind = _LinkKind.childOf;
   String? _anchorId;
 
@@ -65,6 +72,41 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     _isLiving = m.isLiving;
     _birthDate = m.birthDate;
     _deathDate = m.deathDate;
+    _photoUrl = m.photoUrl;
+  }
+
+  Future<void> _pickPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_rounded),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() => _pickedBytes = bytes);
   }
 
   Future<void> _pickDate({required bool isBirth}) async {
@@ -92,7 +134,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     setState(() => _submitting = true);
     final repo = ref.read(memberRepositoryProvider);
 
-    final draft = Member(
+    var draft = Member(
       id: widget.memberId ?? '',
       familyId: familyId,
       firstName: _firstName.text.trim(),
@@ -106,13 +148,29 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
       birthPlace:
           _birthPlace.text.trim().isEmpty ? null : _birthPlace.text.trim(),
       bio: _bio.text.trim().isEmpty ? null : _bio.text.trim(),
+      photoUrl: _photoUrl,
     );
 
     try {
       if (widget.isEditing) {
+        // Upload first (member id already exists) so the URL persists with the
+        // rest of the edits in a single update.
+        if (_pickedBytes != null) {
+          final url = await repo.uploadMemberPhoto(
+              familyId: familyId,
+              memberId: widget.memberId!,
+              bytes: _pickedBytes!);
+          draft = draft.copyWith(photoUrl: url);
+        }
         await repo.updateMember(draft);
       } else {
         final created = await repo.addMember(draft);
+        // New member needs an id before we can upload to its storage path.
+        if (_pickedBytes != null) {
+          final url = await repo.uploadMemberPhoto(
+              familyId: familyId, memberId: created.id, bytes: _pickedBytes!);
+          await repo.updateMember(created.copyWith(photoUrl: url));
+        }
         await _createLinkIfNeeded(repo, familyId, created.id);
       }
       invalidateFamilyData(ref, familyId);
@@ -225,6 +283,14 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
+            Center(
+              child: _PhotoHeader(
+                pickedBytes: _pickedBytes,
+                photoUrl: _photoUrl,
+                onTap: _pickPhoto,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
             TextFormField(
               controller: _firstName,
               textCapitalization: TextCapitalization.words,
@@ -315,6 +381,61 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PhotoHeader extends StatelessWidget {
+  const _PhotoHeader({
+    required this.pickedBytes,
+    required this.photoUrl,
+    required this.onTap,
+  });
+
+  final Uint8List? pickedBytes;
+  final String? photoUrl;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.primary;
+
+    ImageProvider? image;
+    if (pickedBytes != null) {
+      image = MemoryImage(pickedBytes!);
+    } else if ((photoUrl ?? '').isNotEmpty) {
+      image = NetworkImage(photoUrl!);
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        children: [
+          CircleAvatar(
+            radius: 56,
+            backgroundColor: color.withValues(alpha: 0.12),
+            backgroundImage: image,
+            child: image == null
+                ? Icon(Icons.add_a_photo_rounded, size: 36, color: color)
+                : null,
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: theme.colorScheme.surface, width: 2),
+              ),
+              child: Icon(Icons.edit_rounded,
+                  size: 16, color: theme.colorScheme.onPrimary),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -43,6 +45,25 @@ class MemberRepository {
 
   Future<void> deleteMember(String id) async {
     await _client.from('members').delete().eq('id', id);
+  }
+
+  /// Uploads a member photo to the `member-photos` bucket and returns its public
+  /// URL. Path is `{familyId}/{memberId}/...` so storage RLS can authorize the
+  /// write by family role. A timestamped filename avoids stale CDN caching.
+  Future<String> uploadMemberPhoto({
+    required String familyId,
+    required String memberId,
+    required Uint8List bytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    final path =
+        '$familyId/$memberId/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    await _client.storage.from('member-photos').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: true),
+        );
+    return _client.storage.from('member-photos').getPublicUrl(path);
   }
 
   // ---- Relationships -------------------------------------------------------
