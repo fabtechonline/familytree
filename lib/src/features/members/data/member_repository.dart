@@ -78,6 +78,9 @@ class MemberRepository {
         .toList();
   }
 
+  /// Adds a relationship edge, skipping duplicates. A unique index prevents
+  /// exact-direction duplicates; for spouse/partner unions we also skip the
+  /// reverse direction (a↔b is the same union as b↔a).
   Future<void> addRelationship({
     required String familyId,
     required String fromMember,
@@ -85,13 +88,29 @@ class MemberRepository {
     required RelType type,
     RelSubtype subtype = RelSubtype.biological,
   }) async {
-    await _client.from('relationships').insert({
-      'family_id': familyId,
-      'from_member': fromMember,
-      'to_member': toMember,
-      'type': type.name,
-      'subtype': subtype.name,
-    });
+    if (type == RelType.spouse || type == RelType.partner) {
+      final existing = await _client
+          .from('relationships')
+          .select('id')
+          .eq('family_id', familyId)
+          .inFilter('type', ['spouse', 'partner']).or(
+              'and(from_member.eq.$fromMember,to_member.eq.$toMember),'
+              'and(from_member.eq.$toMember,to_member.eq.$fromMember)');
+      if ((existing as List).isNotEmpty) return;
+    }
+
+    // ON CONFLICT DO NOTHING against the (family, from, to, type) unique index.
+    await _client.from('relationships').upsert(
+      {
+        'family_id': familyId,
+        'from_member': fromMember,
+        'to_member': toMember,
+        'type': type.name,
+        'subtype': subtype.name,
+      },
+      onConflict: 'family_id,from_member,to_member,type',
+      ignoreDuplicates: true,
+    );
   }
 
   Future<void> deleteRelationship(String id) async {
