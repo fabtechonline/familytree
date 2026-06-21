@@ -99,5 +99,33 @@ void main() {
       final layout = TreeLayoutEngine.build(FamilyGraph.build([], []));
       expect(layout.isEmpty, isTrue);
     });
+
+    test('spouses sit on the same row, adjacent, with child descending from couple',
+        () {
+      final members = [
+        _m('h', 'Husband', birthYear: 1970),
+        _m('w', 'Wife', birthYear: 1972),
+        _m('c', 'Child', birthYear: 2000),
+      ];
+      // Child is linked to only one parent in data, but should still descend
+      // from the couple.
+      final graph = FamilyGraph.build(
+          members, [_spouse('h', 'w'), _parent('h', 'c')]);
+      final layout = TreeLayoutEngine.build(graph);
+
+      Offset center(String id) =>
+          layout.nodes.firstWhere((n) => n.member.id == id).center;
+
+      // Same row (married-in spouse shares the row).
+      expect(center('h').dy, center('w').dy);
+      // Adjacent horizontally (one column apart).
+      expect((center('h').dx - center('w').dx).abs(),
+          closeTo(TreeLayoutEngine.nodeWidth + TreeLayoutEngine.hGap, 0.5));
+      // Child below the couple.
+      expect(center('c').dy, greaterThan(center('h').dy));
+      // The descent for the child records both parents (couple anchor).
+      final descent = layout.descents.firstWhere((d) => d.child == 'c');
+      expect({descent.parentA, descent.parentB}, containsAll(['h', 'w']));
+    });
   });
 }

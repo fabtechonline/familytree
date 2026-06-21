@@ -97,6 +97,31 @@ class MemberRepository {
   Future<void> deleteRelationship(String id) async {
     await _client.from('relationships').delete().eq('id', id);
   }
+
+  /// Makes [newMemberId] a sibling of [siblingOfId] by giving the new member the
+  /// same parents (siblings are derived from shared parents). If the sibling has
+  /// no recorded parents yet, no edges are created.
+  Future<void> linkSiblingByParents({
+    required String familyId,
+    required String newMemberId,
+    required String siblingOfId,
+  }) async {
+    final rows = await _client
+        .from('relationships')
+        .select('from_member')
+        .eq('family_id', familyId)
+        .eq('type', 'parent')
+        .eq('to_member', siblingOfId);
+
+    for (final row in rows as List) {
+      await addRelationship(
+        familyId: familyId,
+        fromMember: row['from_member'] as String,
+        toMember: newMemberId,
+        type: RelType.parent,
+      );
+    }
+  }
 }
 
 final memberRepositoryProvider = Provider<MemberRepository>((ref) {

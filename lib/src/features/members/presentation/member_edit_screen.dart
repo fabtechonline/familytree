@@ -13,8 +13,55 @@ import '../domain/member.dart';
 import '../domain/relationship.dart';
 import 'widgets/member_avatar.dart';
 
-/// How a brand-new member links to an existing one.
-enum _LinkKind { childOf, parentOf, partnerOf, none }
+/// How a brand-new member links to an existing one. Each option also implies
+/// the new member's gender and which graph edge(s) to create.
+enum _LinkKind {
+  wifeOf,
+  husbandOf,
+  sonOf,
+  daughterOf,
+  brotherOf,
+  sisterOf,
+  none;
+
+  String get label => switch (this) {
+        _LinkKind.wifeOf => 'Wife of',
+        _LinkKind.husbandOf => 'Husband of',
+        _LinkKind.sonOf => 'Son of',
+        _LinkKind.daughterOf => 'Daughter of',
+        _LinkKind.brotherOf => 'Brother of',
+        _LinkKind.sisterOf => 'Sister of',
+        _LinkKind.none => 'No link',
+      };
+
+  /// Gender implied for the new member, or null for [none].
+  String? get impliedGender => switch (this) {
+        _LinkKind.wifeOf || _LinkKind.daughterOf || _LinkKind.sisterOf =>
+          'female',
+        _LinkKind.husbandOf || _LinkKind.sonOf || _LinkKind.brotherOf => 'male',
+        _LinkKind.none => null,
+      };
+}
+
+/// A selectable anchor in the relationship picker: either a single person or a
+/// married couple (shown together on one line).
+class _AnchorOption {
+  const _AnchorOption({
+    required this.key,
+    required this.label,
+    required this.memberIds,
+    required this.primary,
+    this.secondary,
+  });
+
+  final String key;
+  final String label;
+  final List<String> memberIds;
+  final Member primary;
+  final Member? secondary;
+
+  bool get isCouple => secondary != null;
+}
 
 /// Add or edit a member. When [memberId] is null this is an "add" flow that can
 /// also create one relationship to an existing member.
@@ -46,8 +93,12 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
   Uint8List? _pickedBytes;
   String? _photoUrl;
 
-  _LinkKind _linkKind = _LinkKind.childOf;
-  String? _anchorId;
+  _LinkKind _linkKind = _LinkKind.sonOf;
+
+  /// The selected anchor option key and the member id(s) it resolves to (one
+  /// for a single person, two for a married couple).
+  String? _anchorKey;
+  List<String> _anchorIds = const [];
 
   bool _submitting = false;
   bool _initialized = false;
@@ -184,30 +235,68 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     }
   }
 
+  /// Builds the anchor list: every person individually, then each married
+  /// couple combined onto one line (e.g. "John & Mary Smith").
+  List<_AnchorOption> _buildAnchorOptions(
+      List<Member> anchors, List<Relationship> relationships) {
+    final byId = {for (final m in anchors) m.id: m};
+    final options = <_AnchorOption>[
+      for (final m in anchors)
+        _AnchorOption(
+            key: m.id, label: m.fullName, memberIds: [m.id], primary: m),
+    ];
+
+    final seen = <String>{};
+    for (final r in relationships) {
+      if (!r.isUnion) continue;
+      final a = byId[r.fromMember];
+      final b = byId[r.toMember];
+      if (a == null || b == null) continue;
+      final pairKey =
+          a.id.compareTo(b.id) < 0 ? '${a.id}+${b.id}' : '${b.id}+${a.id}';
+      if (!seen.add(pairKey)) continue;
+      options.add(_AnchorOption(
+        key: 'couple:$pairKey',
+        label: '${a.firstName} & ${b.fullName}',
+        memberIds: [a.id, b.id],
+        primary: a,
+        secondary: b,
+      ));
+    }
+    return options;
+  }
+
   Future<void> _createLinkIfNeeded(
       MemberRepository repo, String familyId, String newId) async {
-    final anchor = _anchorId;
-    if (_linkKind == _LinkKind.none || anchor == null) return;
+    final anchors = _anchorIds;
+    if (_linkKind == _LinkKind.none || anchors.isEmpty) return;
 
     switch (_linkKind) {
-      case _LinkKind.childOf:
+      // New member is the spouse of the anchor (use the first if a couple was
+      // somehow selected — spouse links are 1:1).
+      case _LinkKind.wifeOf:
+      case _LinkKind.husbandOf:
         await repo.addRelationship(
             familyId: familyId,
-            fromMember: anchor,
-            toMember: newId,
-            type: RelType.parent);
-      case _LinkKind.parentOf:
-        await repo.addRelationship(
-            familyId: familyId,
-            fromMember: newId,
-            toMember: anchor,
-            type: RelType.parent);
-      case _LinkKind.partnerOf:
-        await repo.addRelationship(
-            familyId: familyId,
-            fromMember: anchor,
+            fromMember: anchors.first,
             toMember: newId,
             type: RelType.spouse);
+      // New member is a child of the anchor(s) — link to both parents if a
+      // couple was selected.
+      case _LinkKind.sonOf:
+      case _LinkKind.daughterOf:
+        for (final parentId in anchors) {
+          await repo.addRelationship(
+              familyId: familyId,
+              fromMember: parentId,
+              toMember: newId,
+              type: RelType.parent);
+        }
+      // New member is a sibling of the anchor: share the anchor's parents.
+      case _LinkKind.brotherOf:
+      case _LinkKind.sisterOf:
+        await repo.linkSiblingByParents(
+            familyId: familyId, newMemberId: newId, siblingOfId: anchors.first);
       case _LinkKind.none:
         break;
     }
@@ -251,6 +340,8 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     }
     final membersAsync = ref.watch(membersProvider(family.id));
     final members = membersAsync.value ?? const <Member>[];
+    final relationships =
+        ref.watch(relationshipsProvider(family.id)).value ?? const [];
 
     // Hydrate fields once when editing an existing member.
     if (widget.isEditing && !_initialized) {
@@ -261,10 +352,14 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
       }
     }
 
-    // Candidate anchors for linking (exclude the member being edited).
-    final anchors =
-        members.where((m) => m.id != widget.memberId).toList();
-    _anchorId ??= anchors.isNotEmpty ? anchors.first.id : null;
+    // Candidate anchors for linking (exclude the member being edited): each
+    // single person, plus married couples shown together on one line.
+    final anchors = members.where((m) => m.id != widget.memberId).toList();
+    final anchorOptions = _buildAnchorOptions(anchors, relationships);
+    if (_anchorKey == null && anchorOptions.isNotEmpty) {
+      _anchorKey = anchorOptions.first.key;
+      _anchorIds = anchorOptions.first.memberIds;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -281,7 +376,14 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          // Extra bottom padding so the save button clears the device
+          // navigation bar / gesture area.
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.md,
+            AppSpacing.xl + MediaQuery.paddingOf(context).bottom,
+          ),
           children: [
             Center(
               child: _PhotoHeader(
@@ -358,14 +460,22 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
             ),
 
             // Relationship picker only when adding and there's someone to link to.
-            if (!widget.isEditing && anchors.isNotEmpty) ...[
+            if (!widget.isEditing && anchorOptions.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.lg),
               _RelationshipPicker(
                 kind: _linkKind,
-                anchorId: _anchorId,
-                anchors: anchors,
-                onKindChanged: (k) => setState(() => _linkKind = k),
-                onAnchorChanged: (id) => setState(() => _anchorId = id),
+                selectedKey: _anchorKey,
+                options: anchorOptions,
+                onKindChanged: (k) => setState(() {
+                  _linkKind = k;
+                  // Auto-fill gender implied by the relationship.
+                  final g = k.impliedGender;
+                  if (g != null) _gender = g;
+                }),
+                onAnchorChanged: (option) => setState(() {
+                  _anchorKey = option.key;
+                  _anchorIds = option.memberIds;
+                }),
               ),
             ],
 
@@ -510,29 +620,26 @@ class _DateField extends StatelessWidget {
 class _RelationshipPicker extends StatelessWidget {
   const _RelationshipPicker({
     required this.kind,
-    required this.anchorId,
-    required this.anchors,
+    required this.selectedKey,
+    required this.options,
     required this.onKindChanged,
     required this.onAnchorChanged,
   });
 
   final _LinkKind kind;
-  final String? anchorId;
-  final List<Member> anchors;
+  final String? selectedKey;
+  final List<_AnchorOption> options;
   final ValueChanged<_LinkKind> onKindChanged;
-  final ValueChanged<String?> onAnchorChanged;
-
-  static const _labels = {
-    _LinkKind.childOf: 'Child of',
-    _LinkKind.parentOf: 'Parent of',
-    _LinkKind.partnerOf: 'Partner of',
-    _LinkKind.none: 'No link',
-  };
+  final ValueChanged<_AnchorOption> onAnchorChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final anchor = anchors.where((m) => m.id == anchorId).firstOrNull;
+    final selected =
+        options.where((o) => o.key == selectedKey).firstOrNull ?? options.first;
+    final anchorName = selected.isCouple
+        ? '${selected.primary.firstName} & ${selected.secondary!.firstName}'
+        : selected.primary.firstName;
 
     return Card(
       child: Padding(
@@ -546,36 +653,57 @@ class _RelationshipPicker extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.sm,
-              children: _labels.entries.map((e) {
+              runSpacing: AppSpacing.xs,
+              children: _LinkKind.values.map((k) {
                 return ChoiceChip(
-                  label: Text(e.value),
-                  selected: kind == e.key,
-                  onSelected: (_) => onKindChanged(e.key),
+                  label: Text(k.label),
+                  selected: kind == k,
+                  onSelected: (_) => onKindChanged(k),
                 );
               }).toList(),
             ),
             if (kind != _LinkKind.none) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text('This person is the ${kind.label.toLowerCase()} $anchorName',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant)),
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
-                  if (anchor != null) ...[
-                    MemberAvatar(member: anchor, radius: 18),
-                    const SizedBox(width: AppSpacing.sm),
-                  ],
+                  _AnchorAvatars(option: selected),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      initialValue: anchorId,
+                      initialValue: selected.key,
                       isExpanded: true,
                       decoration:
                           const InputDecoration(labelText: 'Related member'),
-                      items: anchors
-                          .map((m) => DropdownMenuItem(
-                                value: m.id,
-                                child: Text(m.fullName,
-                                    overflow: TextOverflow.ellipsis),
+                      items: options
+                          .map((o) => DropdownMenuItem(
+                                value: o.key,
+                                child: Row(
+                                  children: [
+                                    if (o.isCouple)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 6),
+                                        child: Icon(Icons.favorite_rounded,
+                                            size: 14,
+                                            color: AppColors.accentCoral),
+                                      ),
+                                    Expanded(
+                                      child: Text(o.label,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ],
+                                ),
                               ))
                           .toList(),
-                      onChanged: onAnchorChanged,
+                      onChanged: (key) {
+                        if (key == null) return;
+                        final option =
+                            options.firstWhere((o) => o.key == key);
+                        onAnchorChanged(option);
+                      },
                     ),
                   ),
                 ],
@@ -583,6 +711,37 @@ class _RelationshipPicker extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Shows one avatar for a single anchor, or two overlapping avatars for a
+/// married couple.
+class _AnchorAvatars extends StatelessWidget {
+  const _AnchorAvatars({required this.option});
+  final _AnchorOption option;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!option.isCouple) {
+      return MemberAvatar(member: option.primary, radius: 18);
+    }
+    return SizedBox(
+      width: 52,
+      height: 36,
+      child: Stack(
+        children: [
+          MemberAvatar(member: option.primary, radius: 18),
+          Positioned(
+            left: 16,
+            child: CircleAvatar(
+              radius: 19,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              child: MemberAvatar(member: option.secondary!, radius: 18),
+            ),
+          ),
+        ],
       ),
     );
   }

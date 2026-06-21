@@ -82,6 +82,7 @@ class _EdgePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final centers = {for (final n in layout.nodes) n.member.id: n.center};
     final halfH = layout.nodeSize.height / 2;
+    final halfW = layout.nodeSize.width / 2;
 
     final parentPaint = Paint()
       ..color = scheme.outlineVariant
@@ -93,23 +94,44 @@ class _EdgePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    for (final edge in layout.edges) {
-      final a = centers[edge.from];
-      final b = centers[edge.to];
-      if (a == null || b == null) continue;
+    // Parent→child descents first (behind the union bars).
+    for (final d in layout.descents) {
+      final a = centers[d.parentA];
+      final child = centers[d.child];
+      if (a == null || child == null) continue;
 
-      if (edge.isUnion) {
-        canvas.drawLine(a, b, unionPaint);
+      // Anchor: midpoint between the couple, or the single parent.
+      final b = d.parentB == null ? null : centers[d.parentB!];
+      final anchorX = b == null ? a.dx : (a.dx + b.dx) / 2;
+      final anchorY = a.dy + halfH;
+
+      final end = Offset(child.dx, child.dy - halfH);
+      final midY = (anchorY + end.dy) / 2;
+      final path = Path()
+        ..moveTo(anchorX, anchorY)
+        ..lineTo(anchorX, midY)
+        ..lineTo(end.dx, midY)
+        ..lineTo(end.dx, end.dy);
+      canvas.drawPath(path, parentPaint);
+    }
+
+    // Spouse links: a bar between the two nodes' inner edges.
+    for (final u in layout.unions) {
+      final a = centers[u.a];
+      final b = centers[u.b];
+      if (a == null || b == null) continue;
+      final left = a.dx <= b.dx ? a : b;
+      final right = a.dx <= b.dx ? b : a;
+      // If they're side-by-side on the same row, connect inner edges; otherwise
+      // just connect centers.
+      if ((left.dy - right.dy).abs() < 1) {
+        canvas.drawLine(
+          Offset(left.dx + halfW, left.dy),
+          Offset(right.dx - halfW, right.dy),
+          unionPaint,
+        );
       } else {
-        final start = Offset(a.dx, a.dy + halfH);
-        final end = Offset(b.dx, b.dy - halfH);
-        final midY = (start.dy + end.dy) / 2;
-        final path = Path()
-          ..moveTo(start.dx, start.dy)
-          ..lineTo(start.dx, midY)
-          ..lineTo(end.dx, midY)
-          ..lineTo(end.dx, end.dy);
-        canvas.drawPath(path, parentPaint);
+        canvas.drawLine(a, b, unionPaint);
       }
     }
   }
