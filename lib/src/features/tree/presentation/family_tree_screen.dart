@@ -87,6 +87,8 @@ class _EdgePainter extends CustomPainter {
     final parentPaint = Paint()
       ..color = scheme.outlineVariant
       ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
     final unionPaint = Paint()
       ..color = AppColors.accentCoral
@@ -94,46 +96,96 @@ class _EdgePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    // Parent→child descents first (behind the union bars).
+    // --- Parent→child connectors, drawn as a clean "bus" per parent anchor:
+    //     a trunk down from the couple, one horizontal sibling bar, and a drop
+    //     to each child. ----------------------------------------------------
+    final groups = <String, List<DescentLink>>{};
     for (final d in layout.descents) {
-      final a = centers[d.parentA];
-      final child = centers[d.child];
-      if (a == null || child == null) continue;
+      groups.putIfAbsent('${d.parentA}|${d.parentB}', () => []).add(d);
+    }
 
-      // Anchor: midpoint between the couple, or the single parent.
-      final b = d.parentB == null ? null : centers[d.parentB!];
+    for (final group in groups.values) {
+      final first = group.first;
+      final a = centers[first.parentA];
+      if (a == null) continue;
+      final b = first.parentB == null ? null : centers[first.parentB!];
       final anchorX = b == null ? a.dx : (a.dx + b.dx) / 2;
       final anchorY = a.dy + halfH;
 
-      final end = Offset(child.dx, child.dy - halfH);
-      final midY = (anchorY + end.dy) / 2;
-      final path = Path()
-        ..moveTo(anchorX, anchorY)
-        ..lineTo(anchorX, midY)
-        ..lineTo(end.dx, midY)
-        ..lineTo(end.dx, end.dy);
-      canvas.drawPath(path, parentPaint);
+      final childTops = <Offset>[];
+      for (final d in group) {
+        final c = centers[d.child];
+        if (c != null) childTops.add(Offset(c.dx, c.dy - halfH));
+      }
+      if (childTops.isEmpty) continue;
+
+      final busY = anchorY + (childTops.first.dy - anchorY) / 2;
+
+      // Trunk down from the couple to the bus.
+      canvas.drawLine(Offset(anchorX, anchorY), Offset(anchorX, busY), parentPaint);
+
+      // Horizontal sibling bar spanning the children (and the trunk).
+      final xs = [anchorX, ...childTops.map((o) => o.dx)];
+      final barLeft = xs.reduce((v, e) => e < v ? e : v);
+      final barRight = xs.reduce((v, e) => e > v ? e : v);
+      if (barRight - barLeft > 0.5) {
+        canvas.drawLine(
+            Offset(barLeft, busY), Offset(barRight, busY), parentPaint);
+      }
+
+      // Drop to each child.
+      for (final top in childTops) {
+        canvas.drawLine(Offset(top.dx, busY), top, parentPaint);
+      }
     }
 
-    // Spouse links: a bar between the two nodes' inner edges.
+    // --- Spouse links: a bar between the two nodes' inner edges, with a heart
+    //     at the midpoint. --------------------------------------------------
     for (final u in layout.unions) {
       final a = centers[u.a];
       final b = centers[u.b];
       if (a == null || b == null) continue;
       final left = a.dx <= b.dx ? a : b;
       final right = a.dx <= b.dx ? b : a;
-      // If they're side-by-side on the same row, connect inner edges; otherwise
-      // just connect centers.
-      if ((left.dy - right.dy).abs() < 1) {
-        canvas.drawLine(
-          Offset(left.dx + halfW, left.dy),
-          Offset(right.dx - halfW, right.dy),
-          unionPaint,
-        );
-      } else {
-        canvas.drawLine(a, b, unionPaint);
-      }
+      final sameRow = (left.dy - right.dy).abs() < 1;
+      final start =
+          sameRow ? Offset(left.dx + halfW, left.dy) : left;
+      final end = sameRow ? Offset(right.dx - halfW, right.dy) : right;
+      canvas.drawLine(start, end, unionPaint);
+      _drawHeart(
+        canvas,
+        Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2),
+      );
     }
+  }
+
+  /// Draws a small filled heart centered at [c] on a white disc so it reads
+  /// clearly on top of the marriage line.
+  void _drawHeart(Canvas canvas, Offset c) {
+    const r = 11.0;
+    canvas.drawCircle(c, r, Paint()..color = scheme.surface);
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..color = AppColors.accentCoral
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke,
+    );
+
+    final tp = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.favorite_rounded.codePoint),
+        style: TextStyle(
+          fontSize: 14,
+          fontFamily: Icons.favorite_rounded.fontFamily,
+          package: Icons.favorite_rounded.fontPackage,
+          color: AppColors.accentCoral,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, c - Offset(tp.width / 2, tp.height / 2));
   }
 
   @override

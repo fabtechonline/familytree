@@ -59,8 +59,10 @@ class FamilyDashboardScreen extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => invalidateFamilyData(ref, family.id),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md, AppSpacing.md, AppSpacing.md, 96),
+          // Bottom padding leaves room for the FAB and the device nav bar so
+          // the last member isn't hidden behind them.
+          padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md,
+              AppSpacing.md, 96 + MediaQuery.paddingOf(context).bottom),
           children: [
             _StatsSection(familyId: family.id),
             const SizedBox(height: AppSpacing.md),

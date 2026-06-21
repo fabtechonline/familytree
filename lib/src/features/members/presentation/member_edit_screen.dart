@@ -13,11 +13,16 @@ import '../domain/member.dart';
 import '../domain/relationship.dart';
 import 'widgets/member_avatar.dart';
 
+/// The semantic category of a relationship, independent of gender.
+enum _RelCategory { spouse, parent, child, sibling, none }
+
 /// How a brand-new member links to an existing one. Each option also implies
 /// the new member's gender and which graph edge(s) to create.
 enum _LinkKind {
-  wifeOf,
   husbandOf,
+  wifeOf,
+  fatherOf,
+  motherOf,
   sonOf,
   daughterOf,
   brotherOf,
@@ -25,8 +30,10 @@ enum _LinkKind {
   none;
 
   String get label => switch (this) {
-        _LinkKind.wifeOf => 'Wife of',
         _LinkKind.husbandOf => 'Husband of',
+        _LinkKind.wifeOf => 'Wife of',
+        _LinkKind.fatherOf => 'Father of',
+        _LinkKind.motherOf => 'Mother of',
         _LinkKind.sonOf => 'Son of',
         _LinkKind.daughterOf => 'Daughter of',
         _LinkKind.brotherOf => 'Brother of',
@@ -36,11 +43,50 @@ enum _LinkKind {
 
   /// Gender implied for the new member, or null for [none].
   String? get impliedGender => switch (this) {
-        _LinkKind.wifeOf || _LinkKind.daughterOf || _LinkKind.sisterOf =>
+        _LinkKind.wifeOf ||
+        _LinkKind.motherOf ||
+        _LinkKind.daughterOf ||
+        _LinkKind.sisterOf =>
           'female',
-        _LinkKind.husbandOf || _LinkKind.sonOf || _LinkKind.brotherOf => 'male',
+        _LinkKind.husbandOf ||
+        _LinkKind.fatherOf ||
+        _LinkKind.sonOf ||
+        _LinkKind.brotherOf =>
+          'male',
         _LinkKind.none => null,
       };
+
+  _RelCategory get category => switch (this) {
+        _LinkKind.husbandOf || _LinkKind.wifeOf => _RelCategory.spouse,
+        _LinkKind.fatherOf || _LinkKind.motherOf => _RelCategory.parent,
+        _LinkKind.sonOf || _LinkKind.daughterOf => _RelCategory.child,
+        _LinkKind.brotherOf || _LinkKind.sisterOf => _RelCategory.sibling,
+        _LinkKind.none => _RelCategory.none,
+      };
+
+  /// The same relationship category expressed for a given gender, so switching
+  /// gender keeps the user's intent (e.g. "Son of" -> "Daughter of").
+  static _LinkKind forCategoryGender(_RelCategory cat, bool male) {
+    return switch (cat) {
+      _RelCategory.spouse => male ? _LinkKind.husbandOf : _LinkKind.wifeOf,
+      _RelCategory.parent => male ? _LinkKind.fatherOf : _LinkKind.motherOf,
+      _RelCategory.child => male ? _LinkKind.sonOf : _LinkKind.daughterOf,
+      _RelCategory.sibling => male ? _LinkKind.brotherOf : _LinkKind.sisterOf,
+      _RelCategory.none => _LinkKind.none,
+    };
+  }
+
+  /// Options to show for the currently chosen [gender]. When no specific gender
+  /// is chosen, all options are shown.
+  static List<_LinkKind> forGender(String? gender) {
+    if (gender == 'male') {
+      return [husbandOf, fatherOf, sonOf, brotherOf, none];
+    }
+    if (gender == 'female') {
+      return [wifeOf, motherOf, daughterOf, sisterOf, none];
+    }
+    return _LinkKind.values;
+  }
 }
 
 /// A selectable anchor in the relationship picker: either a single person or a
@@ -281,6 +327,16 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
             fromMember: anchors.first,
             toMember: newId,
             type: RelType.spouse);
+      // New member is a parent of the anchor(s).
+      case _LinkKind.fatherOf:
+      case _LinkKind.motherOf:
+        for (final childId in anchors) {
+          await repo.addRelationship(
+              familyId: familyId,
+              fromMember: newId,
+              toMember: childId,
+              type: RelType.parent);
+        }
       // New member is a child of the anchor(s) — link to both parents if a
       // couple was selected.
       case _LinkKind.sonOf:
@@ -418,7 +474,15 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
             const SizedBox(height: AppSpacing.md),
             _GenderPicker(
               value: _gender,
-              onChanged: (g) => setState(() => _gender = g),
+              onChanged: (g) => setState(() {
+                _gender = g;
+                // Keep the chosen relationship's intent but flip it to match the
+                // new gender (e.g. "Son of" -> "Daughter of").
+                if (g != null && _linkKind != _LinkKind.none) {
+                  _linkKind =
+                      _LinkKind.forCategoryGender(_linkKind.category, g == 'male');
+                }
+              }),
             ),
             const SizedBox(height: AppSpacing.md),
             SwitchListTile(
@@ -464,6 +528,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
               const SizedBox(height: AppSpacing.lg),
               _RelationshipPicker(
                 kind: _linkKind,
+                visibleKinds: _LinkKind.forGender(_gender),
                 selectedKey: _anchorKey,
                 options: anchorOptions,
                 onKindChanged: (k) => setState(() {
@@ -620,6 +685,7 @@ class _DateField extends StatelessWidget {
 class _RelationshipPicker extends StatelessWidget {
   const _RelationshipPicker({
     required this.kind,
+    required this.visibleKinds,
     required this.selectedKey,
     required this.options,
     required this.onKindChanged,
@@ -627,6 +693,7 @@ class _RelationshipPicker extends StatelessWidget {
   });
 
   final _LinkKind kind;
+  final List<_LinkKind> visibleKinds;
   final String? selectedKey;
   final List<_AnchorOption> options;
   final ValueChanged<_LinkKind> onKindChanged;
@@ -654,7 +721,7 @@ class _RelationshipPicker extends StatelessWidget {
             Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.xs,
-              children: _LinkKind.values.map((k) {
+              children: visibleKinds.map((k) {
                 return ChoiceChip(
                   label: Text(k.label),
                   selected: kind == k,
