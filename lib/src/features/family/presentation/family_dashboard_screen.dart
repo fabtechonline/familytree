@@ -36,15 +36,30 @@ class FamilyDashboardScreen extends ConsumerWidget {
             ),
           PopupMenuButton<String>(
             onSelected: (value) {
-              if (value == 'signout') {
-                ref.read(authRepositoryProvider).signOut();
-              } else if (value == 'new-family') {
-                context.push('/create-family');
+              switch (value) {
+                case 'signout':
+                  ref.read(authRepositoryProvider).signOut();
+                case 'new-family':
+                  context.push('/create-family');
+                case 'join-family':
+                  context.push('/join');
+                case 'invite':
+                  context.push('/invite');
+                case 'members-roles':
+                  context.push('/members-roles');
               }
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'new-family', child: Text('New family')),
-              PopupMenuItem(value: 'signout', child: Text('Sign out')),
+            itemBuilder: (context) => [
+              if (family.myRole.isAdmin) ...[
+                const PopupMenuItem(
+                    value: 'invite', child: Text('Invite family')),
+                const PopupMenuItem(
+                    value: 'members-roles', child: Text('Members & roles')),
+              ],
+              const PopupMenuItem(
+                  value: 'join-family', child: Text('Join a family')),
+              const PopupMenuItem(value: 'new-family', child: Text('New family')),
+              const PopupMenuItem(value: 'signout', child: Text('Sign out')),
             ],
           ),
         ],

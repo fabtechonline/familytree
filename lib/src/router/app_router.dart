@@ -9,6 +9,9 @@ import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/verify_otp_screen.dart';
 import '../features/family/presentation/create_family_screen.dart';
 import '../features/family/presentation/home_gate.dart';
+import '../features/invite/presentation/invite_screen.dart';
+import '../features/invite/presentation/join_family_screen.dart';
+import '../features/invite/presentation/members_roles_screen.dart';
 import '../features/members/presentation/member_edit_screen.dart';
 import '../features/tree/presentation/family_tree_screen.dart';
 
@@ -56,6 +59,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/tree',
         builder: (context, state) => const FamilyTreeScreen(),
+      ),
+      GoRoute(
+        path: '/invite',
+        builder: (context, state) => const InviteScreen(),
+      ),
+      GoRoute(
+        path: '/join',
+        builder: (context, state) => const JoinFamilyScreen(),
+      ),
+      GoRoute(
+        path: '/members-roles',
+        builder: (context, state) => const MembersRolesScreen(),
       ),
     ],
   );

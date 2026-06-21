@@ -3,6 +3,8 @@
          manifest so it's present in release builds (debug/profile add it
          automatically, release does not). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Camera is used to scan family invite QR codes. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
 
     <application
         android:label="FamilyTree"

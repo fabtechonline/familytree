@@ -125,6 +125,12 @@ class _CreateFamilyScreenState extends ConsumerState<CreateFamilyScreen> {
                             )
                           : const Text('Create family'),
                     ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextButton.icon(
+                      onPressed: () => context.push('/join'),
+                      icon: const Icon(Icons.group_add_rounded),
+                      label: const Text('Join an existing family'),
+                    ),
                   ],
                 ),
               ),
