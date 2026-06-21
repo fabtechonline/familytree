@@ -170,6 +170,12 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     _birthDate = m.birthDate;
     _deathDate = m.deathDate;
     _photoUrl = m.photoUrl;
+    // Keep the default "Add relationship" option consistent with this member's
+    // gender so it appears among the gender-filtered chips.
+    if (m.gender == 'male' || m.gender == 'female') {
+      _linkKind =
+          _LinkKind.forCategoryGender(_RelCategory.child, m.gender == 'male');
+    }
   }
 
   Future<void> _pickPhoto() async {
@@ -313,48 +319,87 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
   }
 
   Future<void> _createLinkIfNeeded(
-      MemberRepository repo, String familyId, String newId) async {
-    final anchors = _anchorIds;
-    if (_linkKind == _LinkKind.none || anchors.isEmpty) return;
+      MemberRepository repo, String familyId, String newId) {
+    return _applyLink(repo, familyId, newId, _linkKind, _anchorIds);
+  }
 
-    switch (_linkKind) {
-      // New member is the spouse of the anchor (use the first if a couple was
-      // somehow selected — spouse links are 1:1).
+  /// Applies the relationship described by [kind] between [memberId] and the
+  /// selected [anchorIds]. Reused by both the add flow (on save) and the edit
+  /// flow ("Add relationship").
+  Future<void> _applyLink(MemberRepository repo, String familyId,
+      String memberId, _LinkKind kind, List<String> anchorIds) async {
+    if (kind == _LinkKind.none || anchorIds.isEmpty) return;
+
+    switch (kind) {
+      // This person is the spouse of the anchor (1:1).
       case _LinkKind.wifeOf:
       case _LinkKind.husbandOf:
         await repo.addRelationship(
             familyId: familyId,
-            fromMember: anchors.first,
-            toMember: newId,
+            fromMember: anchorIds.first,
+            toMember: memberId,
             type: RelType.spouse);
-      // New member is a parent of the anchor(s).
+      // This person is a parent of the anchor(s).
       case _LinkKind.fatherOf:
       case _LinkKind.motherOf:
-        for (final childId in anchors) {
+        for (final childId in anchorIds) {
           await repo.addRelationship(
               familyId: familyId,
-              fromMember: newId,
+              fromMember: memberId,
               toMember: childId,
               type: RelType.parent);
         }
-      // New member is a child of the anchor(s) — link to both parents if a
+      // This person is a child of the anchor(s) — link to both parents if a
       // couple was selected.
       case _LinkKind.sonOf:
       case _LinkKind.daughterOf:
-        for (final parentId in anchors) {
+        for (final parentId in anchorIds) {
           await repo.addRelationship(
               familyId: familyId,
               fromMember: parentId,
-              toMember: newId,
+              toMember: memberId,
               type: RelType.parent);
         }
-      // New member is a sibling of the anchor: share the anchor's parents.
+      // This person is a sibling of the anchor: share the anchor's parents.
       case _LinkKind.brotherOf:
       case _LinkKind.sisterOf:
         await repo.linkSiblingByParents(
-            familyId: familyId, newMemberId: newId, siblingOfId: anchors.first);
+            familyId: familyId,
+            newMemberId: memberId,
+            siblingOfId: anchorIds.first);
       case _LinkKind.none:
         break;
+    }
+  }
+
+  /// Adds the currently-selected relationship to an existing member (edit flow).
+  Future<void> _addRelationshipNow(String familyId) async {
+    if (_linkKind == _LinkKind.none || _anchorIds.isEmpty) return;
+    setState(() => _submitting = true);
+    try {
+      await _applyLink(ref.read(memberRepositoryProvider), familyId,
+          widget.memberId!, _linkKind, _anchorIds);
+      invalidateFamilyData(ref, familyId);
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Relationship added')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not add: $e')));
+    }
+  }
+
+  Future<void> _removeRelationship(String familyId, String relId) async {
+    try {
+      await ref.read(memberRepositoryProvider).deleteRelationship(relId);
+      invalidateFamilyData(ref, familyId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not remove: $e')));
     }
   }
 
@@ -523,14 +568,29 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
                   labelText: 'Bio / notes', alignLabelWithHint: true),
             ),
 
-            // Relationship picker only when adding and there's someone to link to.
-            if (!widget.isEditing && anchorOptions.isNotEmpty) ...[
+            // Existing relationships (edit flow): list with remove buttons.
+            if (widget.isEditing) ...[
+              const SizedBox(height: AppSpacing.lg),
+              _ExistingRelationships(
+                memberId: widget.memberId!,
+                members: members,
+                relationships: relationships,
+                onRemove: (relId) => _removeRelationship(family.id, relId),
+              ),
+            ],
+
+            // Relationship picker: on add it applies on Save; on edit there's an
+            // explicit "Add relationship" button.
+            if (anchorOptions.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.lg),
               _RelationshipPicker(
                 kind: _linkKind,
                 visibleKinds: _LinkKind.forGender(_gender),
                 selectedKey: _anchorKey,
                 options: anchorOptions,
+                title: widget.isEditing
+                    ? 'Add a relationship'
+                    : 'How are they related?',
                 onKindChanged: (k) => setState(() {
                   _linkKind = k;
                   // Auto-fill gender implied by the relationship.
@@ -542,6 +602,15 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
                   _anchorIds = option.memberIds;
                 }),
               ),
+              if (widget.isEditing) ...[
+                const SizedBox(height: AppSpacing.sm),
+                OutlinedButton.icon(
+                  onPressed:
+                      _submitting ? null : () => _addRelationshipNow(family.id),
+                  icon: const Icon(Icons.link_rounded),
+                  label: const Text('Add relationship'),
+                ),
+              ],
             ],
 
             const SizedBox(height: AppSpacing.xl),
@@ -688,6 +757,7 @@ class _RelationshipPicker extends StatelessWidget {
     required this.visibleKinds,
     required this.selectedKey,
     required this.options,
+    required this.title,
     required this.onKindChanged,
     required this.onAnchorChanged,
   });
@@ -696,6 +766,7 @@ class _RelationshipPicker extends StatelessWidget {
   final List<_LinkKind> visibleKinds;
   final String? selectedKey;
   final List<_AnchorOption> options;
+  final String title;
   final ValueChanged<_LinkKind> onKindChanged;
   final ValueChanged<_AnchorOption> onAnchorChanged;
 
@@ -714,7 +785,7 @@ class _RelationshipPicker extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('How are they related?',
+            Text(title,
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: AppSpacing.sm),
@@ -807,6 +878,116 @@ class _AnchorAvatars extends StatelessWidget {
               backgroundColor: Theme.of(context).colorScheme.surface,
               child: MemberAvatar(member: option.secondary!, radius: 18),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Lists the member's current parents, spouse(s) and children, each removable.
+class _ExistingRelationships extends StatelessWidget {
+  const _ExistingRelationships({
+    required this.memberId,
+    required this.members,
+    required this.relationships,
+    required this.onRemove,
+  });
+
+  final String memberId;
+  final List<Member> members;
+  final List<Relationship> relationships;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final byId = {for (final m in members) m.id: m};
+
+    final rows = <Widget>[];
+    void addRow(Relationship r, String otherId, String role) {
+      final other = byId[otherId];
+      if (other == null) return;
+      rows.add(_RelationshipRow(
+        member: other,
+        role: role,
+        onRemove: () => onRemove(r.id),
+      ));
+    }
+
+    for (final r in relationships) {
+      if (r.isUnion && (r.fromMember == memberId || r.toMember == memberId)) {
+        final other = r.fromMember == memberId ? r.toMember : r.fromMember;
+        addRow(r, other, 'Spouse');
+      } else if (r.isParentChild && r.toMember == memberId) {
+        addRow(r, r.fromMember, 'Parent');
+      } else if (r.isParentChild && r.fromMember == memberId) {
+        addRow(r, r.toMember, 'Child');
+      }
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Relationships',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: AppSpacing.xs),
+            if (rows.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Text('No relationships yet.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant)),
+              )
+            else
+              ...rows,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RelationshipRow extends StatelessWidget {
+  const _RelationshipRow({
+    required this.member,
+    required this.role,
+    required this.onRemove,
+  });
+
+  final Member member;
+  final String role;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          MemberAvatar(member: member, radius: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(member.fullName,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(role,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Remove',
+            icon: const Icon(Icons.close_rounded, size: 20),
+            onPressed: onRemove,
           ),
         ],
       ),
