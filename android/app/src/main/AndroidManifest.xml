@@ -1,6 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for Supabase auth, data and storage. Must live in the MAIN
+         manifest so it's present in release builds (debug/profile add it
+         automatically, release does not). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
-        android:label="familytree"
+        android:label="FamilyTree"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
