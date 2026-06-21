@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../family/application/family_providers.dart';
+import '../../family/domain/family.dart';
+import '../../suggestions/data/suggestion_repository.dart';
 import '../application/member_providers.dart';
 import '../data/member_repository.dart';
 import '../domain/member.dart';
@@ -232,6 +234,63 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     }
   }
 
+  /// Member fields for a contributor suggestion payload (snake_case to match
+  /// the columns the apply RPC writes).
+  Map<String, dynamic> _suggestionPayload() {
+    String? clean(TextEditingController c) =>
+        c.text.trim().isEmpty ? null : c.text.trim();
+    String? d(DateTime? v) => v?.toIso8601String().split('T').first;
+    return {
+      'first_name': _firstName.text.trim(),
+      'last_name': clean(_lastName),
+      'maiden_name': clean(_maidenName),
+      'gender': _gender,
+      'birth_date': d(_birthDate),
+      'death_date': _isLiving ? null : d(_deathDate),
+      'is_living': _isLiving,
+      'birth_place': clean(_birthPlace),
+      'bio': clean(_bio),
+    };
+  }
+
+  Future<void> _submitSuggestion(String familyId) async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
+    final repo = ref.read(suggestionRepositoryProvider);
+    try {
+      if (widget.isEditing) {
+        await repo.suggestMemberEdit(
+            familyId: familyId,
+            targetMemberId: widget.memberId!,
+            payload: _suggestionPayload());
+      } else {
+        await repo.suggestMemberAdd(
+            familyId: familyId, payload: _suggestionPayload());
+      }
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Sent for approval'),
+          content: const Text(
+              'Your suggestion was sent to the family admins. It will appear once approved.'),
+          actions: [
+            FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK')),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not send: $e')));
+    }
+  }
+
   Future<void> _save(String familyId, List<Member> existing) async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
@@ -444,6 +503,12 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     final relationships =
         ref.watch(relationshipsProvider(family.id)).value ?? const [];
 
+    // Admins/editors write directly; contributors submit suggestions and so see
+    // a simplified form (no photo/relationship/delete controls); viewers are
+    // read-only.
+    final canEdit = family.myRole.canEdit;
+    final canSuggest = family.myRole == FamilyRole.contributor;
+
     // Hydrate fields once when editing an existing member.
     if (widget.isEditing && !_initialized) {
       final existing = members.where((m) => m.id == widget.memberId).firstOrNull;
@@ -462,11 +527,15 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
       _anchorIds = anchorOptions.first.memberIds;
     }
 
+    final title = canEdit
+        ? (widget.isEditing ? 'Edit member' : 'Add member')
+        : (widget.isEditing ? 'Suggest changes' : 'Suggest member');
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isEditing ? 'Edit member' : 'Add member'),
+        title: Text(title),
         actions: [
-          if (widget.isEditing)
+          if (widget.isEditing && canEdit)
             IconButton(
               icon: const Icon(Icons.delete_outline_rounded),
               tooltip: 'Delete',
@@ -486,14 +555,23 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
             AppSpacing.xl + MediaQuery.paddingOf(context).bottom,
           ),
           children: [
-            Center(
-              child: _PhotoHeader(
-                pickedBytes: _pickedBytes,
-                photoUrl: _photoUrl,
-                onTap: _pickPhoto,
+            if (canSuggest) ...[
+              _SuggestionBanner(),
+              const SizedBox(height: AppSpacing.md),
+            ] else if (!canEdit) ...[
+              _ViewOnlyBanner(),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            if (canEdit) ...[
+              Center(
+                child: _PhotoHeader(
+                  pickedBytes: _pickedBytes,
+                  photoUrl: _photoUrl,
+                  onTap: _pickPhoto,
+                ),
               ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.lg),
+            ],
             TextFormField(
               controller: _firstName,
               textCapitalization: TextCapitalization.words,
@@ -569,7 +647,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
             ),
 
             // Existing relationships (edit flow): list with remove buttons.
-            if (widget.isEditing) ...[
+            if (canEdit && widget.isEditing) ...[
               const SizedBox(height: AppSpacing.lg),
               _ExistingRelationships(
                 memberId: widget.memberId!,
@@ -581,7 +659,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
 
             // Relationship picker: on add it applies on Save; on edit there's an
             // explicit "Add relationship" button.
-            if (anchorOptions.isNotEmpty) ...[
+            if (canEdit && anchorOptions.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.lg),
               _RelationshipPicker(
                 kind: _linkKind,
@@ -613,18 +691,73 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
               ],
             ],
 
-            const SizedBox(height: AppSpacing.xl),
-            FilledButton(
-              onPressed: _submitting ? null : () => _save(family.id, members),
-              child: _submitting
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.5))
-                  : Text(widget.isEditing ? 'Save changes' : 'Add member'),
-            ),
+            if (canEdit || canSuggest) ...[
+              const SizedBox(height: AppSpacing.xl),
+              FilledButton(
+                onPressed: _submitting
+                    ? null
+                    : () => canEdit
+                        ? _save(family.id, members)
+                        : _submitSuggestion(family.id),
+                child: _submitting
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5))
+                    : Text(canEdit
+                        ? (widget.isEditing ? 'Save changes' : 'Add member')
+                        : 'Send suggestion'),
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Banner shown to contributors explaining their edits go through approval.
+class _SuggestionBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return _InfoBanner(
+      icon: Icons.info_outline_rounded,
+      text: 'Your changes will be sent to a family admin for approval.',
+    );
+  }
+}
+
+/// Banner shown to viewers who can't make changes.
+class _ViewOnlyBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return _InfoBanner(
+      icon: Icons.visibility_rounded,
+      text: 'You have view-only access to this family.',
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: theme.colorScheme.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: Text(text, style: theme.textTheme.bodySmall)),
+        ],
       ),
     );
   }

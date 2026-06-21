@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../config/supabase_providers.dart';
 import '../../invite/data/invite_repository.dart';
 import '../../members/application/member_providers.dart';
+import '../../suggestions/data/suggestion_repository.dart';
 import 'family_providers.dart';
 
 /// Subscribes to Realtime changes for a family and invalidates the relevant
@@ -36,6 +37,8 @@ final familyRealtimeProvider =
     // A role change for the current user should update their permissions live.
     ref.invalidate(myFamiliesProvider);
   });
+  bind('edit_suggestions',
+      () => ref.invalidate(pendingSuggestionsProvider(familyId)));
 
   channel.subscribe();
   ref.onDispose(() => client.removeChannel(channel));

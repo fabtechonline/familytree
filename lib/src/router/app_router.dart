@@ -13,6 +13,7 @@ import '../features/invite/presentation/invite_screen.dart';
 import '../features/invite/presentation/join_family_screen.dart';
 import '../features/invite/presentation/members_roles_screen.dart';
 import '../features/members/presentation/member_edit_screen.dart';
+import '../features/suggestions/presentation/suggestions_screen.dart';
 import '../features/tree/presentation/family_tree_screen.dart';
 
 /// App router. Redirects unauthenticated users to sign-in and authenticated
@@ -71,6 +72,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/members-roles',
         builder: (context, state) => const MembersRolesScreen(),
+      ),
+      GoRoute(
+        path: '/suggestions',
+        builder: (context, state) => const SuggestionsScreen(),
       ),
     ],
   );

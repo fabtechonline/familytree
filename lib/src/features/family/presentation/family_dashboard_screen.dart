@@ -7,6 +7,7 @@ import '../../auth/data/auth_repository.dart';
 import '../../members/application/member_providers.dart';
 import '../../members/domain/member.dart';
 import '../../members/presentation/widgets/member_avatar.dart';
+import '../../suggestions/data/suggestion_repository.dart';
 import '../../tree/application/tree_providers.dart';
 import '../application/family_providers.dart';
 import '../application/realtime_provider.dart';
@@ -51,6 +52,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
                   context.push('/invite');
                 case 'members-roles':
                   context.push('/members-roles');
+                case 'suggestions':
+                  context.push('/suggestions');
               }
             },
             itemBuilder: (context) => [
@@ -59,6 +62,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
                     value: 'invite', child: Text('Invite family')),
                 const PopupMenuItem(
                     value: 'members-roles', child: Text('Members & roles')),
+                const PopupMenuItem(
+                    value: 'suggestions', child: Text('Suggestions')),
               ],
               const PopupMenuItem(
                   value: 'join-family', child: Text('Join a family')),
@@ -68,11 +73,15 @@ class FamilyDashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: family.myRole.canEdit
+      floatingActionButton: (family.myRole.canEdit ||
+              family.myRole == FamilyRole.contributor)
           ? FloatingActionButton.extended(
               onPressed: () => context.push('/member/new'),
-              icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('Add member'),
+              icon: Icon(family.myRole.canEdit
+                  ? Icons.person_add_alt_1_rounded
+                  : Icons.edit_note_rounded),
+              label: Text(
+                  family.myRole.canEdit ? 'Add member' : 'Suggest member'),
             )
           : null,
       body: RefreshIndicator(
@@ -83,6 +92,7 @@ class FamilyDashboardScreen extends ConsumerWidget {
           padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md,
               AppSpacing.md, 96 + MediaQuery.paddingOf(context).bottom),
           children: [
+            if (family.myRole.isAdmin) _SuggestionsBanner(familyId: family.id),
             _StatsSection(familyId: family.id),
             const SizedBox(height: AppSpacing.md),
             _ViewTreeCard(onTap: () => context.push('/tree')),
@@ -149,6 +159,39 @@ class _StatsSection extends ConsumerWidget {
               label: 'Ancestors',
               value: '${s.ancestors}'),
         ],
+      ),
+    );
+  }
+}
+
+class _SuggestionsBanner extends ConsumerWidget {
+  const _SuggestionsBanner({required this.familyId});
+  final String familyId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pending = ref.watch(pendingSuggestionsProvider(familyId)).value ?? const [];
+    if (pending.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Card(
+        color: theme.colorScheme.primary.withValues(alpha: 0.10),
+        child: ListTile(
+          onTap: () => context.push('/suggestions'),
+          leading: CircleAvatar(
+            backgroundColor: theme.colorScheme.primary,
+            child: Text('${pending.length}',
+                style: TextStyle(
+                    color: theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.w800)),
+          ),
+          title: Text(
+              '${pending.length} suggestion${pending.length == 1 ? '' : 's'} to review',
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: const Text('Tap to approve or reject'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+        ),
       ),
     );
   }
