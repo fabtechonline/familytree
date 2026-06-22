@@ -65,20 +65,27 @@ class AdminFamily {
     required this.id,
     required this.name,
     required this.tier,
-    required this.memberCount,
+    required this.userCount,
+    required this.personCount,
     this.createdAt,
   });
   final String id;
   final String name;
   final String tier;
-  final int memberCount;
+
+  /// App users (logins) in this family.
+  final int userCount;
+
+  /// People in the family tree.
+  final int personCount;
   final DateTime? createdAt;
 
   factory AdminFamily.fromMap(Map<String, dynamic> m) => AdminFamily(
         id: m['id'] as String,
         name: m['name'] as String,
         tier: m['subscription_tier'] as String? ?? 'free',
-        memberCount: (m['member_count'] as num?)?.toInt() ?? 0,
+        userCount: (m['member_count'] as num?)?.toInt() ?? 0,
+        personCount: (m['person_count'] as num?)?.toInt() ?? 0,
         createdAt: m['created_at'] == null
             ? null
             : DateTime.tryParse(m['created_at'] as String),

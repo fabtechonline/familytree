@@ -364,7 +364,9 @@ class _FamiliesSection extends ConsumerWidget {
               child: ListTile(
                 title: Text(f.name,
                     style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('${f.memberCount} member(s)'),
+                subtitle: Text(
+                    '${f.personCount} ${f.personCount == 1 ? 'person' : 'people'} in tree  ·  '
+                    '${f.userCount} ${f.userCount == 1 ? 'user' : 'users'}'),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
