@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,20 +51,27 @@ class MemberRepository {
   /// Uploads a member photo to the `member-photos` bucket and returns its public
   /// URL. Path is `{familyId}/{memberId}/...` so storage RLS can authorize the
   /// write by family role. A timestamped filename avoids stale CDN caching.
+  /// Uploads via the `upload-photo` Edge Function (server-side service-role
+  /// write), since storage-api rejects end-user JWTs on this project. Returns
+  /// the public URL.
   Future<String> uploadMemberPhoto({
     required String familyId,
     required String memberId,
     required Uint8List bytes,
     String contentType = 'image/jpeg',
   }) async {
-    final path =
-        '$familyId/$memberId/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    await _client.storage.from('member-photos').uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(contentType: contentType, upsert: true),
-        );
-    return _client.storage.from('member-photos').getPublicUrl(path);
+    final res = await _client.functions.invoke('upload-photo', body: {
+      'familyId': familyId,
+      'memberId': memberId,
+      'folder': 'avatar',
+      'contentType': contentType,
+      'dataBase64': base64Encode(bytes),
+    });
+    if (res.status != 200) {
+      throw Exception(
+          (res.data is Map ? res.data['error'] : null) ?? 'Upload failed');
+    }
+    return (res.data as Map)['url'] as String;
   }
 
   // ---- Relationships -------------------------------------------------------

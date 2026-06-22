@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,14 +32,19 @@ class MemoryRepository {
     required Uint8List bytes,
     String? caption,
   }) async {
-    final path =
-        '$familyId/$memberId/memories/${DateTime.now().millisecondsSinceEpoch}.jpg';
-    await _client.storage.from('member-photos').uploadBinary(
-          path,
-          bytes,
-          fileOptions: const FileOptions(contentType: 'image/jpeg'),
-        );
-    final url = _client.storage.from('member-photos').getPublicUrl(path);
+    // Upload via the Edge Function (service-role write), then record the row.
+    final res = await _client.functions.invoke('upload-photo', body: {
+      'familyId': familyId,
+      'memberId': memberId,
+      'folder': 'memories',
+      'contentType': 'image/jpeg',
+      'dataBase64': base64Encode(bytes),
+    });
+    if (res.status != 200) {
+      throw Exception(
+          (res.data is Map ? res.data['error'] : null) ?? 'Upload failed');
+    }
+    final url = (res.data as Map)['url'] as String;
     await _client.from('member_media').insert({
       'family_id': familyId,
       'member_id': memberId,

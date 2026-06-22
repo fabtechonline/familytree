@@ -140,19 +140,7 @@ class _ResultCard extends StatelessWidget {
                 key: ValueKey('$aId-$bId-${k.label}'),
                 children: [
                   Text.rich(
-                    TextSpan(children: [
-                      TextSpan(text: '${b.firstName} is '),
-                      TextSpan(
-                        text: k.related ? k.label : k.label,
-                        style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: k.related
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant),
-                      ),
-                      if (k.related && k.label != 'the same person')
-                        TextSpan(text: ' of ${a.firstName}.'),
-                    ]),
+                    _resultSpan(theme, a.firstName, b.firstName, k),
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleLarge,
                   ),
@@ -164,6 +152,33 @@ class _ResultCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Builds the result sentence with correct grammar: possessive for kinship
+/// terms ("B is A's mother-in-law."), descriptive otherwise ("B and A are
+/// related by marriage.").
+TextSpan _resultSpan(ThemeData theme, String aName, String bName, Kinship k) {
+  final hl = TextStyle(
+    fontWeight: FontWeight.w800,
+    color: k.related
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant,
+  );
+  if (k.isTerm) {
+    return TextSpan(children: [
+      TextSpan(text: '$bName is $aName’s '),
+      TextSpan(text: k.label, style: hl),
+      const TextSpan(text: '.'),
+    ]);
+  }
+  if (k.label == 'the same person') {
+    return TextSpan(text: '$aName and $bName are the same person.');
+  }
+  return TextSpan(children: [
+    TextSpan(text: '$bName and $aName are '),
+    TextSpan(text: k.label, style: hl),
+    const TextSpan(text: '.'),
+  ]);
 }
 
 class _Face extends StatelessWidget {

@@ -67,8 +67,22 @@ void main() {
     expect(rel('gp2', 'gp1'), 'husband');
   });
 
-  test('step-parent is related by marriage', () {
-    expect(rel('me', 'p1spouse'), 'related by marriage');
+  test('step-parent', () {
+    // p1spouse is married to me's parent (p1) but isn't my blood parent.
+    expect(rel('me', 'p1spouse'), 'stepmother');
+  });
+
+  test('parent-in-law and child-in-law', () {
+    // gp1 is the father of p1spouse's spouse (p1) -> father-in-law.
+    expect(rel('p1spouse', 'gp1'), 'father-in-law');
+    // p1spouse is the spouse of gp1's child (p1) -> daughter-in-law.
+    expect(rel('gp1', 'p1spouse'), 'daughter-in-law');
+  });
+
+  test('sibling-in-law', () {
+    // p2 is the sister of p1spouse's spouse (p1) -> sister-in-law.
+    expect(rel('p1spouse', 'p2'), 'sister-in-law');
+    expect(rel('p2', 'p1spouse'), 'sister-in-law');
   });
 
   test('great-grandparent', () {
