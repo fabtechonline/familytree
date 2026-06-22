@@ -1,7 +1,7 @@
-import 'package:familytree/src/features/members/domain/member.dart';
-import 'package:familytree/src/features/members/domain/relationship.dart';
-import 'package:familytree/src/features/relate/kinship.dart';
-import 'package:familytree/src/features/tree/domain/family_graph.dart';
+import 'package:riza/src/features/members/domain/member.dart';
+import 'package:riza/src/features/members/domain/relationship.dart';
+import 'package:riza/src/features/relate/kinship.dart';
+import 'package:riza/src/features/tree/domain/family_graph.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Member _m(String id, String gender) =>

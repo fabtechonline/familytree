@@ -18,18 +18,18 @@ Future<void> main() async {
     publishableKey: AppConfig.supabasePublishableKey,
   );
 
-  runApp(const ProviderScope(child: FamilyTreeApp()));
+  runApp(const ProviderScope(child: RizaApp()));
 }
 
-class FamilyTreeApp extends ConsumerWidget {
-  const FamilyTreeApp({super.key});
+class RizaApp extends ConsumerWidget {
+  const RizaApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'FamilyTree',
+      title: 'Riza',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,

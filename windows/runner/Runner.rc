@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.fabtechonline" "\0"
-            VALUE "FileDescription", "familytree" "\0"
+            VALUE "FileDescription", "Riza" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "familytree" "\0"
+            VALUE "InternalName", "riza" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.fabtechonline. All rights reserved." "\0"
-            VALUE "OriginalFilename", "familytree.exe" "\0"
-            VALUE "ProductName", "familytree" "\0"
+            VALUE "OriginalFilename", "riza.exe" "\0"
+            VALUE "ProductName", "Riza" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

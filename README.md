@@ -1,6 +1,6 @@
-# familytree
+# Riza
 
-FamilyTree - collaborative visual family tree app
+Riza - collaborative visual family tree app
 
 ## Getting Started
 

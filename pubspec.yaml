@@ -1,5 +1,5 @@
-name: familytree
-description: "FamilyTree - collaborative visual family tree app"
+name: riza
+description: "Riza - collaborative visual family tree app"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -62,6 +62,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -76,6 +78,7 @@ flutter:
 
   assets:
     - assets/models/mobilefacenet.tflite
+    - assets/branding/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -107,3 +110,33 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# App launcher icons (run: dart run flutter_launcher_icons).
+# Brand teal "R" logo centered on white; Android uses an adaptive icon with a
+# padded foreground over a white background.
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/branding/icon_master.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/branding/icon_foreground.png"
+  web:
+    generate: true
+    image_path: "assets/branding/icon_master.png"
+    background_color: "#FFFFFF"
+    theme_color: "#1FB6A6"
+  windows:
+    generate: true
+    image_path: "assets/branding/icon_master.png"
+    icon_size: 256
+
+# Native splash screen (run: dart run flutter_native_splash:create).
+# Logo centered on a white background, with Android 12+ splash support.
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/branding/splash_logo.png"
+  android_12:
+    image: "assets/branding/splash_logo.png"
+    color: "#FFFFFF"
+  web: false

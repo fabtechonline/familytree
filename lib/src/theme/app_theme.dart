@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// FamilyTree design system: bright, light, modern and professional.
+/// Riza design system: bright, light, modern and professional.
 ///
 /// Built on Material 3 with a friendly seed palette, rounded surfaces, generous
 /// spacing and soft elevation. Use [AppTheme.light] (primary) and

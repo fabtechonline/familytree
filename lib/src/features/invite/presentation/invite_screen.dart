@@ -73,7 +73,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
 
   String _shareText(String familyName) {
     final code = _invite!.code;
-    return 'Join the $familyName family tree on FamilyTree!\n\n'
+    return 'Join the $familyName family tree on Riza!\n\n'
         'Open the app, tap "Join a family", and enter this code:\n$code';
   }
 

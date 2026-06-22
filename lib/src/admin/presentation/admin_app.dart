@@ -19,7 +19,7 @@ class AdminApp extends ConsumerWidget {
       brightness: Brightness.light,
     );
     return MaterialApp(
-      title: 'FamilyTree Admin',
+      title: 'Riza Admin',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

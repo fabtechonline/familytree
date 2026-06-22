@@ -2,7 +2,7 @@
 //
 // Full auth/router tests run against a configured Supabase instance and are
 // added with the integration test suite in a later phase.
-import 'package:familytree/src/features/auth/presentation/sign_in_screen.dart';
+import 'package:riza/src/features/auth/presentation/sign_in_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

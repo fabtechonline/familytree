@@ -69,7 +69,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                       Icon(Icons.shield_moon_rounded,
                           size: 48, color: theme.colorScheme.primary),
                       const SizedBox(height: 16),
-                      Text('FamilyTree Admin',
+                      Text('Riza Admin',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.w800)),

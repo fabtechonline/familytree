@@ -1,6 +1,6 @@
-import 'package:familytree/src/features/celebrations/celebrations.dart';
-import 'package:familytree/src/features/members/domain/member.dart';
-import 'package:familytree/src/features/members/domain/relationship.dart';
+import 'package:riza/src/features/celebrations/celebrations.dart';
+import 'package:riza/src/features/members/domain/member.dart';
+import 'package:riza/src/features/members/domain/relationship.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 Member _m(String id, String name,

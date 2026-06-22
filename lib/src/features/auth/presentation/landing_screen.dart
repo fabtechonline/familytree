@@ -34,18 +34,18 @@ class LandingScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      height: 110,
-                      width: 110,
+                      height: 120,
+                      width: 120,
                       alignment: Alignment.center,
+                      padding: const EdgeInsets.all(AppSpacing.lg),
                       decoration: BoxDecoration(
-                        color: AppColors.seed.withValues(alpha: 0.15),
+                        color: AppColors.seed.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.park_rounded,
-                          size: 64, color: AppColors.seed),
+                      child: Image.asset('assets/branding/riza_logo.png'),
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    Text('FamilyTree',
+                    Text('Riza',
                         style: theme.textTheme.displaySmall?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: AppColors.seed)),

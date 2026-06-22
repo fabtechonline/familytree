@@ -1,11 +1,11 @@
 {
-    "name": "familytree",
-    "short_name": "familytree",
+    "name": "Riza",
+    "short_name": "Riza",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "FamilyTree - collaborative visual family tree app",
+    "background_color": "#FFFFFF",
+    "theme_color": "#1FB6A6",
+    "description": "Riza - collaborative visual family tree app",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
