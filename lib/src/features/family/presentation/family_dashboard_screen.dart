@@ -141,6 +141,26 @@ class FamilyDashboardScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickLinkCard(
+                    icon: Icons.history_toggle_off_rounded,
+                    label: 'Time Machine',
+                    onTap: () => context.push('/timemachine'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _QuickLinkCard(
+                    icon: Icons.lock_clock_rounded,
+                    label: 'Capsules',
+                    onTap: () => context.push('/capsules'),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
             _UpcomingCelebrations(familyId: family.id),
             const SizedBox(height: AppSpacing.lg),
