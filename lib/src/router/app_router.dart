@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/supabase_providers.dart';
+import '../features/auth/presentation/landing_screen.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/verify_otp_screen.dart';
 import '../features/family/presentation/create_family_screen.dart';
@@ -35,14 +36,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final loggedIn = client.auth.currentSession != null;
       final loc = state.matchedLocation;
-      final inAuthFlow = loc == '/sign-in' || loc == '/verify';
+      // Screens reachable without a session.
+      const unauthRoutes = {'/landing', '/sign-in', '/verify'};
 
-      if (!loggedIn) return inAuthFlow ? null : '/sign-in';
-      if (loggedIn && inAuthFlow) return '/';
+      if (!loggedIn) return unauthRoutes.contains(loc) ? null : '/landing';
+      if (loggedIn && unauthRoutes.contains(loc)) return '/';
       return null;
     },
     routes: [
       GoRoute(path: '/', builder: (context, state) => const HomeGate()),
+      GoRoute(
+        path: '/landing',
+        builder: (context, state) => const LandingScreen(),
+      ),
       GoRoute(
         path: '/sign-in',
         builder: (context, state) => const SignInScreen(),

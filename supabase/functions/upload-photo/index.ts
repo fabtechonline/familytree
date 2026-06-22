@@ -71,9 +71,20 @@ Deno.serve(async (req) => {
   }
   if (!allowed) return json({ error: 'forbidden' }, 403);
 
+  const dir = `${familyId}/${memberId}`;
+
+  // Single photo per member: remove any existing avatar before adding a new one.
+  if (folder !== 'memories') {
+    const { data: existing } = await svc.storage.from('member-photos').list(dir);
+    const stale = (existing ?? [])
+        .filter((o) => o.name.startsWith('avatar_'))
+        .map((o) => `${dir}/${o.name}`);
+    if (stale.length) await svc.storage.from('member-photos').remove(stale);
+  }
+
   const ts = Date.now();
   const leaf = folder === 'memories' ? `memories/${ts}.jpg` : `avatar_${ts}.jpg`;
-  const path = `${familyId}/${memberId}/${leaf}`;
+  const path = `${dir}/${leaf}`;
 
   const { data: signed, error: sErr } = await svc.storage
     .from('member-photos')
