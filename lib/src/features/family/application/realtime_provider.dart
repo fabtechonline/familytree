@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../config/supabase_providers.dart';
+import '../../announcements/data/announcement_repository.dart';
 import '../../invite/data/invite_repository.dart';
 import '../../members/application/member_providers.dart';
 import '../../suggestions/data/suggestion_repository.dart';
@@ -39,6 +40,8 @@ final familyRealtimeProvider =
   });
   bind('edit_suggestions',
       () => ref.invalidate(pendingSuggestionsProvider(familyId)));
+  bind('announcements',
+      () => ref.invalidate(announcementsProvider(familyId)));
 
   channel.subscribe();
   ref.onDispose(() => client.removeChannel(channel));

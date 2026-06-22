@@ -37,6 +37,8 @@ class Relationship {
     required this.toMember,
     required this.type,
     this.subtype = RelSubtype.biological,
+    this.startDate,
+    this.endDate,
   });
 
   final String id;
@@ -46,8 +48,15 @@ class Relationship {
   final RelType type;
   final RelSubtype subtype;
 
+  /// For unions: the marriage/partnership date (used for anniversaries).
+  final DateTime? startDate;
+  final DateTime? endDate;
+
   bool get isParentChild => type == RelType.parent;
   bool get isUnion => type == RelType.spouse || type == RelType.partner;
+
+  static DateTime? _date(dynamic v) =>
+      v == null ? null : DateTime.tryParse(v as String);
 
   factory Relationship.fromMap(Map<String, dynamic> map) {
     return Relationship(
@@ -57,6 +66,8 @@ class Relationship {
       toMember: map['to_member'] as String,
       type: RelType.fromName(map['type'] as String?),
       subtype: RelSubtype.fromName(map['subtype'] as String?),
+      startDate: _date(map['start_date']),
+      endDate: _date(map['end_date']),
     );
   }
 }

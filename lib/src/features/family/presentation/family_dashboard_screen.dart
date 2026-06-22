@@ -7,6 +7,8 @@ import '../../auth/data/auth_repository.dart';
 import '../../members/application/member_providers.dart';
 import '../../members/domain/member.dart';
 import '../../members/presentation/widgets/member_avatar.dart';
+import '../../celebrations/celebrations.dart';
+import '../../celebrations/presentation/celebrations_screen.dart';
 import '../../suggestions/data/suggestion_repository.dart';
 import '../../tree/application/tree_providers.dart';
 import '../application/family_providers.dart';
@@ -96,6 +98,28 @@ class FamilyDashboardScreen extends ConsumerWidget {
             _StatsSection(familyId: family.id),
             const SizedBox(height: AppSpacing.md),
             _ViewTreeCard(onTap: () => context.push('/tree')),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickLinkCard(
+                    icon: Icons.cake_rounded,
+                    label: 'Celebrations',
+                    onTap: () => context.push('/celebrations'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _QuickLinkCard(
+                    icon: Icons.campaign_rounded,
+                    label: 'Family feed',
+                    onTap: () => context.push('/feed'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _UpcomingCelebrations(familyId: family.id),
             const SizedBox(height: AppSpacing.lg),
             Text('Members',
                 style: theme.textTheme.titleLarge
@@ -285,6 +309,68 @@ class _ViewTreeCard extends StatelessWidget {
   }
 }
 
+class _QuickLinkCard extends StatelessWidget {
+  const _QuickLinkCard(
+      {required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          child: Column(
+            children: [
+              Icon(icon, color: theme.colorScheme.primary),
+              const SizedBox(height: 6),
+              Text(label,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _UpcomingCelebrations extends ConsumerWidget {
+  const _UpcomingCelebrations({required this.familyId});
+  final String familyId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(upcomingCelebrationsProvider(familyId)).value;
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final top = items.take(3).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Upcoming celebrations',
+                style: theme.textTheme.titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
+            const Spacer(),
+            if (items.length > 3)
+              TextButton(
+                  onPressed: () => context.push('/celebrations'),
+                  child: const Text('See all')),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        for (final c in top) CelebrationTile(celebration: c),
+      ],
+    );
+  }
+}
+
 class _MembersList extends StatelessWidget {
   const _MembersList({required this.members});
   final List<Member> members;
@@ -297,7 +383,7 @@ class _MembersList extends StatelessWidget {
           Card(
             margin: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: ListTile(
-              onTap: () => context.push('/member/${m.id}'),
+              onTap: () => context.push('/profile/${m.id}'),
               leading: MemberAvatar(member: m),
               title: Text(m.fullName,
                   style: const TextStyle(fontWeight: FontWeight.w700)),

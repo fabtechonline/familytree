@@ -59,7 +59,7 @@ class FamilyTreeScreen extends ConsumerWidget {
                       height: layout.nodeSize.height,
                       child: _TreeNodeCard(
                         member: node.member,
-                        onTap: () => context.push('/member/${node.member.id}'),
+                        onTap: () => context.push('/profile/${node.member.id}'),
                       ),
                     ),
                 ],

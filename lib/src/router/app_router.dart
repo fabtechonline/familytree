@@ -12,7 +12,10 @@ import '../features/family/presentation/home_gate.dart';
 import '../features/invite/presentation/invite_screen.dart';
 import '../features/invite/presentation/join_family_screen.dart';
 import '../features/invite/presentation/members_roles_screen.dart';
+import '../features/announcements/presentation/announcements_screen.dart';
+import '../features/celebrations/presentation/celebrations_screen.dart';
 import '../features/members/presentation/member_edit_screen.dart';
+import '../features/members/presentation/member_profile_screen.dart';
 import '../features/suggestions/presentation/suggestions_screen.dart';
 import '../features/tree/presentation/family_tree_screen.dart';
 
@@ -56,6 +59,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/member/:id',
         builder: (context, state) =>
             MemberEditScreen(memberId: state.pathParameters['id']),
+      ),
+      GoRoute(
+        path: '/profile/:id',
+        builder: (context, state) =>
+            MemberProfileScreen(memberId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/feed',
+        builder: (context, state) => const AnnouncementsScreen(),
+      ),
+      GoRoute(
+        path: '/celebrations',
+        builder: (context, state) => const CelebrationsScreen(),
       ),
       GoRoute(
         path: '/tree',
