@@ -1,12 +1,16 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../family/application/family_providers.dart';
 import '../../family/domain/family.dart';
 import '../../tree/application/tree_providers.dart';
 import '../../tree/domain/family_graph.dart';
+import '../data/memory_repository.dart';
 import '../domain/member.dart';
 import 'widgets/member_avatar.dart';
 
@@ -47,7 +51,12 @@ class MemberProfileScreen extends ConsumerWidget {
           if (member == null) {
             return const Center(child: Text('Member not found.'));
           }
-          return _ProfileBody(graph: graph, member: member);
+          return _ProfileBody(
+            graph: graph,
+            member: member,
+            familyId: family.id,
+            canEdit: family.myRole.canEdit,
+          );
         },
       ),
     );
@@ -55,9 +64,16 @@ class MemberProfileScreen extends ConsumerWidget {
 }
 
 class _ProfileBody extends StatelessWidget {
-  const _ProfileBody({required this.graph, required this.member});
+  const _ProfileBody({
+    required this.graph,
+    required this.member,
+    required this.familyId,
+    required this.canEdit,
+  });
   final FamilyGraph graph;
   final Member member;
+  final String familyId;
+  final bool canEdit;
 
   List<Member> _members(Iterable<String> ids) =>
       ids.map((id) => graph.byId[id]).whereType<Member>().toList();
@@ -156,7 +172,136 @@ class _ProfileBody extends StatelessWidget {
         _RelationGroup(title: 'Spouse / partner', members: _spouses),
         _RelationGroup(title: 'Children', members: _children),
         _RelationGroup(title: 'Siblings', members: _siblings),
+        _MemoriesSection(
+            familyId: familyId, memberId: member.id, canEdit: canEdit),
       ],
+    );
+  }
+}
+
+/// Photo memories for a member: a horizontal gallery with an add button for
+/// editors.
+class _MemoriesSection extends ConsumerWidget {
+  const _MemoriesSection({
+    required this.familyId,
+    required this.memberId,
+    required this.canEdit,
+  });
+  final String familyId;
+  final String memberId;
+  final bool canEdit;
+
+  Future<void> _addMemory(BuildContext context, WidgetRef ref) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+        source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
+    if (picked == null) return;
+    final Uint8List bytes = await picked.readAsBytes();
+    if (!context.mounted) return;
+    final captionController = TextEditingController();
+    final caption = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add a caption'),
+        content: TextField(
+          controller: captionController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Optional caption'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Skip')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, captionController.text),
+              child: const Text('Add')),
+        ],
+      ),
+    );
+    try {
+      await ref.read(memoryRepositoryProvider).add(
+            familyId: familyId,
+            memberId: memberId,
+            bytes: bytes,
+            caption: (caption ?? '').trim().isEmpty ? null : caption!.trim(),
+          );
+      ref.invalidate(memoriesProvider(memberId));
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not add memory: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final memories = ref.watch(memoriesProvider(memberId)).value ?? const [];
+    if (memories.isEmpty && !canEdit) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Memories',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const Spacer(),
+              if (canEdit)
+                TextButton.icon(
+                  onPressed: () => _addMemory(context, ref),
+                  icon: const Icon(Icons.add_a_photo_rounded, size: 18),
+                  label: const Text('Add'),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (memories.isEmpty)
+            Text('No memories yet.',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant))
+          else
+            SizedBox(
+              height: 140,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: memories.length,
+                separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
+                itemBuilder: (context, i) {
+                  final m = memories[i];
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadii.md),
+                    child: Stack(
+                      children: [
+                        Image.network(m.mediaUrl,
+                            width: 140, height: 140, fit: BoxFit.cover),
+                        if ((m.caption ?? '').isNotEmpty)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              color: Colors.black54,
+                              child: Text(m.caption!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 12)),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
