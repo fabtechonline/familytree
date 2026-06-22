@@ -14,6 +14,8 @@ import '../features/invite/presentation/join_family_screen.dart';
 import '../features/invite/presentation/members_roles_screen.dart';
 import '../features/announcements/presentation/announcements_screen.dart';
 import '../features/celebrations/presentation/celebrations_screen.dart';
+import '../features/insights/insights_screen.dart';
+import '../features/relate/relate_screen.dart';
 import '../features/members/presentation/member_edit_screen.dart';
 import '../features/members/presentation/member_profile_screen.dart';
 import '../features/suggestions/presentation/suggestions_screen.dart';
@@ -72,6 +74,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/celebrations',
         builder: (context, state) => const CelebrationsScreen(),
+      ),
+      GoRoute(
+        path: '/relate',
+        builder: (context, state) => const RelateScreen(),
+      ),
+      GoRoute(
+        path: '/insights',
+        builder: (context, state) => const InsightsScreen(),
       ),
       GoRoute(
         path: '/tree',

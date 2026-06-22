@@ -121,6 +121,26 @@ class FamilyDashboardScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickLinkCard(
+                    icon: Icons.diversity_1_rounded,
+                    label: 'How related?',
+                    onTap: () => context.push('/relate'),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _QuickLinkCard(
+                    icon: Icons.insights_rounded,
+                    label: 'Family DNA',
+                    onTap: () => context.push('/insights'),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.md),
             _UpcomingCelebrations(familyId: family.id),
             const SizedBox(height: AppSpacing.lg),
