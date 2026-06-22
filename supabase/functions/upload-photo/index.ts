@@ -48,15 +48,28 @@ Deno.serve(async (req) => {
   if (!familyId || !memberId) return json({ error: 'missing fields' }, 400);
 
   const svc = createClient(url, secret);
-  const { data: fm } = await svc
-    .from('family_members')
-    .select('role')
-    .eq('family_id', familyId)
-    .eq('user_id', user.id)
+
+  // Authorize: admins/editors can upload for anyone; a "relative" can upload
+  // only for the member linked to them (their own profile).
+  const { data: member } = await svc
+    .from('members')
+    .select('linked_user_id, family_id')
+    .eq('id', memberId)
     .maybeSingle();
-  if (!fm || !['admin', 'editor'].includes(fm.role)) {
-    return json({ error: 'forbidden' }, 403);
+  const isOwnProfile =
+    member && member.family_id === familyId && member.linked_user_id === user.id;
+
+  let allowed = !!isOwnProfile;
+  if (!allowed) {
+    const { data: fm } = await svc
+      .from('family_members')
+      .select('role')
+      .eq('family_id', familyId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    allowed = !!fm && ['admin', 'editor'].includes(fm.role);
   }
+  if (!allowed) return json({ error: 'forbidden' }, 403);
 
   const ts = Date.now();
   const leaf = folder === 'memories' ? `memories/${ts}.jpg` : `avatar_${ts}.jpg`;

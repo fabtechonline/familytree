@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../theme/app_theme.dart';
 import '../../family/application/family_providers.dart';
 import '../../family/domain/family.dart';
+import '../../members/application/member_providers.dart';
 import '../data/invite_repository.dart';
 import '../domain/invite_models.dart';
 
@@ -21,6 +22,7 @@ class InviteScreen extends ConsumerStatefulWidget {
 
 class _InviteScreenState extends ConsumerState<InviteScreen> {
   FamilyRole _role = FamilyRole.contributor;
+  String? _targetMemberId; // for "relative" invites
   Invitation? _invite;
   bool _generating = false;
 
@@ -29,6 +31,7 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
     FamilyRole.admin,
     FamilyRole.editor,
     FamilyRole.contributor,
+    FamilyRole.relative,
     FamilyRole.viewer,
   ];
 
@@ -36,15 +39,25 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
         FamilyRole.admin => 'Full control: manage members, settings and billing.',
         FamilyRole.editor => 'Can add and edit members and relationships.',
         FamilyRole.contributor => 'Can suggest changes for an admin to approve.',
+        FamilyRole.relative =>
+          'Can view the family and edit only their own profile.',
         FamilyRole.viewer => 'Can view the tree but not make changes.',
       };
 
   Future<void> _generate(String familyId) async {
+    if (_role == FamilyRole.relative && _targetMemberId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Pick which person this invite is for.')));
+      return;
+    }
     setState(() => _generating = true);
     try {
-      final invite = await ref
-          .read(inviteRepositoryProvider)
-          .createInvitation(familyId, _role);
+      final invite = await ref.read(inviteRepositoryProvider).createInvitation(
+            familyId,
+            _role,
+            targetMemberId:
+                _role == FamilyRole.relative ? _targetMemberId : null,
+          );
       if (!mounted) return;
       setState(() {
         _invite = invite;
@@ -99,6 +112,17 @@ class _InviteScreenState extends ConsumerState<InviteScreen> {
           Text(_roleBlurb,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          if (_role == FamilyRole.relative) ...[
+            const SizedBox(height: AppSpacing.md),
+            _MemberToClaimPicker(
+              familyId: family.id,
+              selectedId: _targetMemberId,
+              onChanged: (id) => setState(() {
+                _targetMemberId = id;
+                _invite = null;
+              }),
+            ),
+          ],
           const SizedBox(height: AppSpacing.lg),
           if (_invite == null)
             FilledButton.icon(
@@ -215,6 +239,38 @@ class _InviteResult extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Lets the admin pick which existing person a "relative" invite is for, so the
+/// joiner is auto-linked to that profile.
+class _MemberToClaimPicker extends ConsumerWidget {
+  const _MemberToClaimPicker({
+    required this.familyId,
+    required this.selectedId,
+    required this.onChanged,
+  });
+  final String familyId;
+  final String? selectedId;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final members = ref.watch(membersProvider(familyId)).value ?? const [];
+    return DropdownButtonFormField<String>(
+      initialValue: selectedId,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Whose profile is this invite for?',
+      ),
+      items: members
+          .map((m) => DropdownMenuItem(
+                value: m.id,
+                child: Text(m.fullName, overflow: TextOverflow.ellipsis),
+              ))
+          .toList(),
+      onChanged: onChanged,
     );
   }
 }

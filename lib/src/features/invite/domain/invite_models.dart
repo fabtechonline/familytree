@@ -36,6 +36,7 @@ class InvitePreview {
     required this.familyName,
     required this.role,
     required this.valid,
+    this.targetMemberName,
   });
 
   final String familyId;
@@ -43,12 +44,16 @@ class InvitePreview {
   final FamilyRole role;
   final bool valid;
 
+  /// For "relative" invites: the name of the profile they'll claim/manage.
+  final String? targetMemberName;
+
   factory InvitePreview.fromMap(Map<String, dynamic> map) {
     return InvitePreview(
       familyId: map['family_id'] as String,
       familyName: map['family_name'] as String,
       role: FamilyRole.fromName(map['role'] as String?),
       valid: map['valid'] as bool? ?? false,
+      targetMemberName: map['target_member_name'] as String?,
     );
   }
 }

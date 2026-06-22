@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../config/supabase_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../family/application/family_providers.dart';
 import '../../family/domain/family.dart';
@@ -503,15 +504,23 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     final relationships =
         ref.watch(relationshipsProvider(family.id)).value ?? const [];
 
-    // Admins/editors write directly; contributors submit suggestions and so see
-    // a simplified form (no photo/relationship/delete controls); viewers are
-    // read-only.
+    final existing =
+        members.where((m) => m.id == widget.memberId).firstOrNull;
+    final myUid = ref.watch(currentSessionProvider)?.user.id;
+
+    // Admins/editors write any member directly. A "relative" can directly edit
+    // only their own linked profile (fields + photo, no relationships/delete).
+    // Contributors submit suggestions; viewers are read-only.
     final canEdit = family.myRole.canEdit;
+    final canSelfEdit = widget.isEditing &&
+        family.myRole.isRelative &&
+        existing?.linkedUserId != null &&
+        existing!.linkedUserId == myUid;
+    final canSaveDirect = canEdit || canSelfEdit;
     final canSuggest = family.myRole == FamilyRole.contributor;
 
     // Hydrate fields once when editing an existing member.
     if (widget.isEditing && !_initialized) {
-      final existing = members.where((m) => m.id == widget.memberId).firstOrNull;
       if (existing != null) {
         _hydrateFrom(existing);
         _initialized = true;
@@ -527,9 +536,11 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
       _anchorIds = anchorOptions.first.memberIds;
     }
 
-    final title = canEdit
-        ? (widget.isEditing ? 'Edit member' : 'Add member')
-        : (widget.isEditing ? 'Suggest changes' : 'Suggest member');
+    final title = canSelfEdit
+        ? 'Edit my profile'
+        : canEdit
+            ? (widget.isEditing ? 'Edit member' : 'Add member')
+            : (widget.isEditing ? 'Suggest changes' : 'Suggest member');
 
     return Scaffold(
       appBar: AppBar(
@@ -558,11 +569,11 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
             if (canSuggest) ...[
               _SuggestionBanner(),
               const SizedBox(height: AppSpacing.md),
-            ] else if (!canEdit) ...[
+            ] else if (!canSaveDirect) ...[
               _ViewOnlyBanner(),
               const SizedBox(height: AppSpacing.md),
             ],
-            if (canEdit) ...[
+            if (canSaveDirect) ...[
               Center(
                 child: _PhotoHeader(
                   pickedBytes: _pickedBytes,
@@ -691,12 +702,12 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
               ],
             ],
 
-            if (canEdit || canSuggest) ...[
+            if (canSaveDirect || canSuggest) ...[
               const SizedBox(height: AppSpacing.xl),
               FilledButton(
                 onPressed: _submitting
                     ? null
-                    : () => canEdit
+                    : () => canSaveDirect
                         ? _save(family.id, members)
                         : _submitSuggestion(family.id),
                 child: _submitting
@@ -704,8 +715,10 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
                         height: 22,
                         width: 22,
                         child: CircularProgressIndicator(strokeWidth: 2.5))
-                    : Text(canEdit
-                        ? (widget.isEditing ? 'Save changes' : 'Add member')
+                    : Text(canSaveDirect
+                        ? (canEdit && !widget.isEditing
+                            ? 'Add member'
+                            : 'Save changes')
                         : 'Send suggestion'),
               ),
             ],

@@ -3,6 +3,7 @@ enum FamilyRole {
   admin,
   editor,
   contributor,
+  relative,
   viewer;
 
   static FamilyRole fromName(String? value) {
@@ -12,11 +13,17 @@ enum FamilyRole {
     );
   }
 
-  /// Can add/edit members and relationships.
+  /// Can add/edit any member and relationships.
   bool get canEdit => this == admin || this == editor;
 
   /// Can manage roster, invites, billing and settings.
   bool get isAdmin => this == admin;
+
+  /// Can view all but edit only their own linked profile.
+  bool get isRelative => this == relative;
+
+  /// Human label.
+  String get label => name[0].toUpperCase() + name.substring(1);
 }
 
 enum SubscriptionTier {

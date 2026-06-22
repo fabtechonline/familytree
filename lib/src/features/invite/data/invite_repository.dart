@@ -10,11 +10,17 @@ class InviteRepository {
 
   final SupabaseClient _client;
 
-  /// Admin-only: mints a new invite code for [familyId] with [role].
-  Future<Invitation> createInvitation(String familyId, FamilyRole role) async {
+  /// Admin-only: mints a new invite code for [familyId] with [role]. For a
+  /// "relative" invite, [targetMemberId] is the profile they will claim/manage.
+  Future<Invitation> createInvitation(
+    String familyId,
+    FamilyRole role, {
+    String? targetMemberId,
+  }) async {
     final result = await _client.rpc('create_invitation', params: {
       'p_family': familyId,
       'p_role': role.name,
+      'p_target_member': targetMemberId,
     });
     final map = (result is List ? result.first : result) as Map<String, dynamic>;
     return Invitation.fromMap(map);

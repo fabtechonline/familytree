@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../config/supabase_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../family/application/family_providers.dart';
 import '../../family/domain/family.dart';
 import '../../tree/application/tree_providers.dart';
 import '../../tree/domain/family_graph.dart';
+import '../application/member_providers.dart';
 import '../data/memory_repository.dart';
 import '../domain/member.dart';
 import 'widgets/member_avatar.dart';
@@ -27,19 +29,30 @@ class MemberProfileScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final graphAsync = ref.watch(familyGraphProvider(family.id));
-    final canChange = family.myRole != FamilyRole.viewer;
+
+    // Decide whether to show an Edit/Suggest action for THIS member.
+    final myUid = ref.watch(currentSessionProvider)?.user.id;
+    final thisMember =
+        ref.watch(membersProvider(family.id)).value?.where((m) => m.id == memberId).firstOrNull;
+    final isOwn = myUid != null && thisMember?.linkedUserId == myUid;
+    final canEditThis =
+        family.myRole.canEdit || (family.myRole.isRelative && isOwn);
+    final canSuggestThis = family.myRole == FamilyRole.contributor;
+    final showAction = canEditThis || canSuggestThis;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
-          if (canChange)
+          if (showAction)
             TextButton.icon(
               onPressed: () => context.push('/member/$memberId'),
-              icon: Icon(family.myRole.canEdit
+              icon: Icon(canEditThis
                   ? Icons.edit_rounded
                   : Icons.edit_note_rounded),
-              label: Text(family.myRole.canEdit ? 'Edit' : 'Suggest'),
+              label: Text(canEditThis
+                  ? (isOwn && family.myRole.isRelative ? 'Edit my profile' : 'Edit')
+                  : 'Suggest'),
             ),
         ],
       ),

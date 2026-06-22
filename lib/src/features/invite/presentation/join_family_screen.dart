@@ -186,11 +186,16 @@ class _PreviewCard extends StatelessWidget {
                 style: theme.textTheme.titleLarge
                     ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
-            if (preview.valid)
+            if (preview.valid) ...[
               Text('You\'ll join as $roleLabel',
                   style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant))
-            else
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              if ((preview.targetMemberName ?? '').isNotEmpty)
+                Text('and manage ${preview.targetMemberName}’s profile',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.primary)),
+            ] else
               Text('This invite has expired',
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(color: theme.colorScheme.error)),
