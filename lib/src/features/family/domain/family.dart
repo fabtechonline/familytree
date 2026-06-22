@@ -40,6 +40,7 @@ class Family {
     required this.createdBy,
     required this.subscriptionTier,
     required this.createdAt,
+    this.settings = const {},
     this.myRole = FamilyRole.viewer,
   });
 
@@ -48,7 +49,11 @@ class Family {
   final String createdBy;
   final SubscriptionTier subscriptionTier;
   final DateTime createdAt;
+  final Map<String, dynamic> settings;
   final FamilyRole myRole;
+
+  /// Opt-in flag for the Point & Recognize face feature.
+  bool get faceRecognitionEnabled => settings['face_recognition'] == true;
 
   factory Family.fromMap(Map<String, dynamic> map, {FamilyRole? role}) {
     return Family(
@@ -58,6 +63,7 @@ class Family {
       subscriptionTier:
           SubscriptionTier.fromName(map['subscription_tier'] as String?),
       createdAt: DateTime.parse(map['created_at'] as String),
+      settings: (map['settings'] as Map?)?.cast<String, dynamic>() ?? const {},
       myRole: role ?? FamilyRole.fromName(map['my_role'] as String?),
     );
   }
