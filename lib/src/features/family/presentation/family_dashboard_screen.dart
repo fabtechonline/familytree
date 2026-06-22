@@ -9,6 +9,7 @@ import '../../members/domain/member.dart';
 import '../../members/presentation/widgets/member_avatar.dart';
 import '../../celebrations/celebrations.dart';
 import '../../celebrations/presentation/celebrations_screen.dart';
+import '../../notifications/notification_service.dart';
 import '../../suggestions/data/suggestion_repository.dart';
 import '../../tree/application/tree_providers.dart';
 import '../application/family_providers.dart';
@@ -30,6 +31,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
     // Keep a live Realtime subscription open while the dashboard is visible so
     // changes from other relatives appear without a manual refresh.
     ref.watch(familyRealtimeProvider(family.id));
+    // (Re)schedule on-device birthday/anniversary reminders.
+    ref.watch(celebrationSchedulerProvider(family.id));
     final membersAsync = ref.watch(membersProvider(family.id));
 
     return Scaffold(
