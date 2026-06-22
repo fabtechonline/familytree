@@ -76,6 +76,8 @@ app.*.map.json
 # --- Secrets & local config (NEVER COMMIT) ---
 FamilyTreeDetails.txt
 RizaDetails.txt
+# Agent memory carried for USB transfer — personal context + may contain secrets.
+.agent-memory/
 *.env
 .env
 .env.*
