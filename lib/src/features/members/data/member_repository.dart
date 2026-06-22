@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../config/supabase_providers.dart';
 import '../domain/member.dart';
 import '../domain/relationship.dart';
+import 'photo_upload.dart';
 
 class MemberRepository {
   MemberRepository(this._client);
@@ -59,19 +59,15 @@ class MemberRepository {
     required String memberId,
     required Uint8List bytes,
     String contentType = 'image/jpeg',
-  }) async {
-    final res = await _client.functions.invoke('upload-photo', body: {
-      'familyId': familyId,
-      'memberId': memberId,
-      'folder': 'avatar',
-      'contentType': contentType,
-      'dataBase64': base64Encode(bytes),
-    });
-    if (res.status != 200) {
-      throw Exception(
-          (res.data is Map ? res.data['error'] : null) ?? 'Upload failed');
-    }
-    return (res.data as Map)['url'] as String;
+  }) {
+    return uploadMemberImage(
+      _client,
+      familyId: familyId,
+      memberId: memberId,
+      folder: 'avatar',
+      bytes: bytes,
+      contentType: contentType,
+    );
   }
 
   // ---- Relationships -------------------------------------------------------

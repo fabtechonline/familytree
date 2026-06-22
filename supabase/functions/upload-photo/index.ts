@@ -1,9 +1,10 @@
-// Edge Function: upload a member photo / memory to Storage.
+// Edge Function: authorize a member-photo upload and return a signed upload URL.
 //
-// Why this exists: with this project's new asymmetric API keys, storage-api
-// rejects end-user JWTs, so direct client uploads fail RLS. This function
-// verifies the caller (via gotrue getUser) and their family role, then uploads
-// with the SERVICE ROLE (which storage accepts), returning a public URL.
+// Why: this project's storage-api rejects end-user JWTs under the new asymmetric
+// API keys, so direct client uploads fail. This function verifies the caller +
+// family role, then mints a short-lived signed upload URL (service role) that
+// the app PUTs bytes to directly — no auth needed on the upload, and no large
+// payload through the function.
 //
 // Deploy: supabase functions deploy upload-photo --no-verify-jwt
 // Secrets: SB_URL, SB_PUBLISHABLE_KEY, SB_SECRET_KEY
@@ -33,31 +34,20 @@ Deno.serve(async (req) => {
   const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
   if (!jwt) return json({ error: 'missing token' }, 401);
 
-  // Verify the caller via gotrue.
   const userClient = createClient(url, publishable);
   const { data: { user }, error: uErr } = await userClient.auth.getUser(jwt);
   if (uErr || !user) return json({ error: 'unauthorized' }, 401);
 
-  let body: {
-    familyId?: string;
-    memberId?: string;
-    folder?: string;
-    contentType?: string;
-    dataBase64?: string;
-  };
+  let body: { familyId?: string; memberId?: string; folder?: string };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'bad body' }, 400);
   }
-  const { familyId, memberId, folder, contentType, dataBase64 } = body;
-  if (!familyId || !memberId || !dataBase64) {
-    return json({ error: 'missing fields' }, 400);
-  }
+  const { familyId, memberId, folder } = body;
+  if (!familyId || !memberId) return json({ error: 'missing fields' }, 400);
 
   const svc = createClient(url, secret);
-
-  // Authorize: caller must be admin/editor of the family.
   const { data: fm } = await svc
     .from('family_members')
     .select('role')
@@ -68,16 +58,20 @@ Deno.serve(async (req) => {
     return json({ error: 'forbidden' }, 403);
   }
 
-  const bytes = Uint8Array.from(atob(dataBase64), (c) => c.charCodeAt(0));
   const ts = Date.now();
   const leaf = folder === 'memories' ? `memories/${ts}.jpg` : `avatar_${ts}.jpg`;
   const path = `${familyId}/${memberId}/${leaf}`;
 
-  const { error: sErr } = await svc.storage
+  const { data: signed, error: sErr } = await svc.storage
     .from('member-photos')
-    .upload(path, bytes, { contentType: contentType ?? 'image/jpeg', upsert: true });
-  if (sErr) return json({ error: sErr.message }, 500);
+    .createSignedUploadUrl(path);
+  if (sErr || !signed) return json({ error: sErr?.message ?? 'sign failed' }, 500);
 
   const { data: pub } = svc.storage.from('member-photos').getPublicUrl(path);
-  return json({ url: pub.publicUrl });
+  return json({
+    signedUrl: signed.signedUrl,
+    token: signed.token,
+    path,
+    publicUrl: pub.publicUrl,
+  });
 });

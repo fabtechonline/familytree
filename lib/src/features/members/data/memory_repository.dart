@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../config/supabase_providers.dart';
 import '../domain/memory.dart';
+import 'photo_upload.dart';
 
 class MemoryRepository {
   MemoryRepository(this._client);
@@ -32,19 +32,14 @@ class MemoryRepository {
     required Uint8List bytes,
     String? caption,
   }) async {
-    // Upload via the Edge Function (service-role write), then record the row.
-    final res = await _client.functions.invoke('upload-photo', body: {
-      'familyId': familyId,
-      'memberId': memberId,
-      'folder': 'memories',
-      'contentType': 'image/jpeg',
-      'dataBase64': base64Encode(bytes),
-    });
-    if (res.status != 200) {
-      throw Exception(
-          (res.data is Map ? res.data['error'] : null) ?? 'Upload failed');
-    }
-    final url = (res.data as Map)['url'] as String;
+    // Upload via signed URL (Edge Function authorizes), then record the row.
+    final url = await uploadMemberImage(
+      _client,
+      familyId: familyId,
+      memberId: memberId,
+      folder: 'memories',
+      bytes: bytes,
+    );
     await _client.from('member_media').insert({
       'family_id': familyId,
       'member_id': memberId,
