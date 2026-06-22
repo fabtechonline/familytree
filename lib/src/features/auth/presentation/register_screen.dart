@@ -5,16 +5,17 @@ import 'package:go_router/go_router.dart';
 import '../../../theme/app_theme.dart';
 import '../application/otp_controller.dart';
 
-/// Sign in with email + password (primary), with an "email me a code" fallback
-/// for accounts without a password or a forgotten one.
-class SignInScreen extends ConsumerStatefulWidget {
-  const SignInScreen({super.key});
+/// Create an account with an email + password. A 6-digit code is emailed to
+/// verify the address (Supabase confirmation), after which the user is signed
+/// in. They can also log in with a code later, or set/change the password.
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  ConsumerState<SignInScreen> createState() => _SignInScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _SignInScreenState extends ConsumerState<SignInScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
@@ -27,43 +28,30 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
-  bool _emailValid() =>
-      RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$').hasMatch(_email.text.trim());
-
-  Future<void> _signIn() async {
+  Future<void> _register() async {
     setState(() => _error = null);
-    if (!_emailValid()) {
+    final email = _email.text.trim();
+    if (!RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$').hasMatch(email)) {
       setState(() => _error = 'Please enter a valid email.');
       return;
     }
-    if (_password.text.isEmpty) {
-      setState(() => _error = 'Please enter your password.');
+    if (_password.text.length < 6) {
+      setState(() => _error = 'Password must be at least 6 characters.');
       return;
     }
-    final err = await ref
+    final res = await ref
         .read(otpControllerProvider.notifier)
-        .signIn(_email.text.trim(), _password.text);
+        .register(email, _password.text);
     if (!mounted) return;
-    if (err == null) {
-      context.go('/');
-    } else {
-      setState(() => _error = err);
-    }
-  }
-
-  Future<void> _emailCode() async {
-    setState(() => _error = null);
-    if (!_emailValid()) {
-      setState(() => _error = 'Enter your email first, then request a code.');
+    if (res.error != null) {
+      setState(() => _error = res.error);
       return;
     }
-    final sent =
-        await ref.read(otpControllerProvider.notifier).sendCode(_email.text.trim());
-    if (!mounted) return;
-    if (sent) {
-      context.push('/verify', extra: _email.text.trim());
+    if (res.needsConfirm) {
+      // Confirm the email with the 6-digit code, then sign in.
+      context.push('/verify', extra: {'email': email, 'signup': true});
     } else {
-      setState(() => _error = 'Could not send a code. Please try again.');
+      context.go('/');
     }
   }
 
@@ -92,16 +80,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       color: theme.colorScheme.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.park_rounded,
-                        size: 44, color: theme.colorScheme.primary),
+                    child: Icon(Icons.person_add_alt_1_rounded,
+                        size: 42, color: theme.colorScheme.primary),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  Text('Welcome back',
+                  Text('Create your account',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w800)),
                   const SizedBox(height: AppSpacing.xs),
-                  Text('Sign in to your family',
+                  Text('We\'ll email a 6-digit code to confirm your address.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant)),
@@ -119,10 +107,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   TextField(
                     controller: _password,
                     obscureText: _obscure,
-                    autofillHints: const [AutofillHints.password],
-                    onSubmitted: (_) => _signIn(),
+                    autofillHints: const [AutofillHints.newPassword],
+                    onSubmitted: (_) => _register(),
                     decoration: InputDecoration(
-                      labelText: 'Password',
+                      labelText: 'Choose a password',
                       prefixIcon: const Icon(Icons.lock_outline_rounded),
                       suffixIcon: IconButton(
                         icon: Icon(_obscure
@@ -139,29 +127,24 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   ],
                   const SizedBox(height: AppSpacing.lg),
                   FilledButton(
-                    onPressed: isLoading ? null : _signIn,
+                    onPressed: isLoading ? null : _register,
                     child: isLoading
                         ? const SizedBox(
                             height: 22,
                             width: 22,
                             child: CircularProgressIndicator(strokeWidth: 2.5))
-                        : const Text('Sign in'),
+                        : const Text('Create account'),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  TextButton(
-                    onPressed: isLoading ? null : _emailCode,
-                    child: const Text('Email me a code instead'),
-                  ),
-                  const Divider(height: AppSpacing.lg),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text("New here?",
+                      Text('Already have an account?',
                           style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant)),
                       TextButton(
-                        onPressed: () => context.push('/register'),
-                        child: const Text('Create an account'),
+                        onPressed: () => context.pop(),
+                        child: const Text('Sign in'),
                       ),
                     ],
                   ),

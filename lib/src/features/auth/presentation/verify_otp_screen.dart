@@ -8,9 +8,12 @@ import '../application/otp_controller.dart';
 
 /// Step 2 of sign-in: enter the 6-digit code emailed to the user.
 class VerifyOtpScreen extends ConsumerStatefulWidget {
-  const VerifyOtpScreen({super.key, required this.email});
+  const VerifyOtpScreen({super.key, required this.email, this.signup = false});
 
   final String email;
+
+  /// True when confirming a brand-new registration (uses the signup token type).
+  final bool signup;
 
   @override
   ConsumerState<VerifyOtpScreen> createState() => _VerifyOtpScreenState();
@@ -31,6 +34,7 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
     final ok = await ref.read(otpControllerProvider.notifier).verifyCode(
           email: widget.email,
           code: code,
+          signup: widget.signup,
         );
     if (!mounted) return;
     if (ok) {

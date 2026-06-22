@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
+import '../../auth/application/otp_controller.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../members/application/member_providers.dart';
 import '../../members/domain/member.dart';
@@ -20,6 +21,79 @@ import '../domain/family.dart';
 /// visual tree. Replaces the Phase 0 placeholder home.
 class FamilyDashboardScreen extends ConsumerWidget {
   const FamilyDashboardScreen({super.key});
+
+  /// Lets the signed-in user set or change their password (so OTP-only accounts
+  /// can add one and then log in with it).
+  Future<void> _setPasswordDialog(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) {
+        var obscure = true;
+        var error = '';
+        var busy = false;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: const Text('Set a password'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                    'Choose a password so you can sign in without a code next time.'),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: controller,
+                  obscureText: obscure,
+                  decoration: InputDecoration(
+                    labelText: 'New password',
+                    errorText: error.isEmpty ? null : error,
+                    suffixIcon: IconButton(
+                      icon: Icon(obscure
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded),
+                      onPressed: () => setLocal(() => obscure = !obscure),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx, false),
+                  child: const Text('Cancel')),
+              FilledButton(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        if (controller.text.length < 6) {
+                          setLocal(() => error = 'At least 6 characters.');
+                          return;
+                        }
+                        setLocal(() => busy = true);
+                        final err = await ref
+                            .read(otpControllerProvider.notifier)
+                            .setPassword(controller.text);
+                        if (err != null) {
+                          setLocal(() {
+                            error = err;
+                            busy = false;
+                          });
+                        } else if (dialogCtx.mounted) {
+                          Navigator.pop(dialogCtx, true);
+                        }
+                      },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (saved == true && context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Password updated.')));
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,6 +133,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
                   context.push('/members-roles');
                 case 'suggestions':
                   context.push('/suggestions');
+                case 'set-password':
+                  _setPasswordDialog(context, ref);
               }
             },
             itemBuilder: (context) => [
@@ -73,6 +149,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
               const PopupMenuItem(
                   value: 'join-family', child: Text('Join a family')),
               const PopupMenuItem(value: 'new-family', child: Text('New family')),
+              const PopupMenuItem(
+                  value: 'set-password', child: Text('Set / change password')),
               const PopupMenuItem(value: 'signout', child: Text('Sign out')),
             ],
           ),

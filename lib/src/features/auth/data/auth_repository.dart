@@ -3,18 +3,36 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../config/supabase_providers.dart';
 
-/// Handles all authentication using **6-digit OTP** (one-time codes).
+/// Handles authentication: password sign-in (primary), a 6-digit email OTP
+/// fallback/recovery, and registration with a password + email verification.
 ///
-/// IMPORTANT: For the email to contain a 6-digit *code* (not a magic link), the
-/// Supabase "Magic Link" email template must render `{{ .Token }}` instead of
-/// `{{ .ConfirmationURL }}`. Supabase issues a 6-digit token by default.
+/// IMPORTANT: For the emails to contain a 6-digit *code* (not a link), the
+/// Supabase "Magic Link" and "Confirm signup" templates render `{{ .Token }}`.
 class AuthRepository {
   AuthRepository(this._client);
 
   final SupabaseClient _client;
 
-  /// Sends a 6-digit OTP code to [email]. Creates the user if they don't exist
-  /// yet (sign-up and login share the same flow).
+  /// Primary login: email + password.
+  Future<AuthResponse> signInWithPassword(String email, String password) {
+    return _client.auth
+        .signInWithPassword(email: email.trim(), password: password);
+  }
+
+  /// Registers a new account with a password. If email confirmation is required
+  /// (it is on this project), the returned session is null and a 6-digit code is
+  /// emailed — verify it with [verifyEmailOtp] using [OtpType.signup].
+  Future<AuthResponse> signUp(String email, String password) {
+    return _client.auth.signUp(email: email.trim(), password: password);
+  }
+
+  /// Sets/updates the password for the currently signed-in user (lets OTP-only
+  /// accounts add a password).
+  Future<void> setPassword(String password) {
+    return _client.auth.updateUser(UserAttributes(password: password));
+  }
+
+  /// Sends a 6-digit OTP code to [email] (the "email me a code" fallback).
   Future<void> sendEmailOtp(String email) {
     return _client.auth.signInWithOtp(
       email: email.trim(),
@@ -22,16 +40,17 @@ class AuthRepository {
     );
   }
 
-  /// Verifies the 6-digit [token] the user received by email, establishing a
-  /// session on success.
+  /// Verifies a 6-digit [token]. [type] is [OtpType.email] for code login or
+  /// [OtpType.signup] for confirming a new registration.
   Future<AuthResponse> verifyEmailOtp({
     required String email,
     required String token,
+    OtpType type = OtpType.email,
   }) {
     return _client.auth.verifyOTP(
       email: email.trim(),
       token: token.trim(),
-      type: OtpType.email,
+      type: type,
     );
   }
 

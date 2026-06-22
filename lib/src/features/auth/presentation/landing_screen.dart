@@ -74,15 +74,21 @@ class LandingScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xl),
                     FilledButton(
-                      onPressed: () => context.push('/sign-in'),
+                      onPressed: () => context.push('/register'),
                       style: FilledButton.styleFrom(
                           minimumSize: const Size.fromHeight(54)),
-                      child: const Text('Get started'),
+                      child: const Text('Create an account'),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    OutlinedButton(
+                      onPressed: () => context.push('/sign-in'),
+                      style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(54)),
+                      child: const Text('I already have an account'),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'New here or returning — continue with your email and a '
-                      '6-digit code.',
+                      'Sign in with your password, or get a 6-digit email code.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant),

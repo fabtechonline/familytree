@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../config/supabase_providers.dart';
 import '../features/auth/presentation/landing_screen.dart';
+import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/sign_in_screen.dart';
 import '../features/auth/presentation/verify_otp_screen.dart';
 import '../features/family/presentation/create_family_screen.dart';
@@ -37,7 +38,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loggedIn = client.auth.currentSession != null;
       final loc = state.matchedLocation;
       // Screens reachable without a session.
-      const unauthRoutes = {'/landing', '/sign-in', '/verify'};
+      const unauthRoutes = {'/landing', '/sign-in', '/register', '/verify'};
 
       if (!loggedIn) return unauthRoutes.contains(loc) ? null : '/landing';
       if (loggedIn && unauthRoutes.contains(loc)) return '/';
@@ -54,9 +55,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SignInScreen(),
       ),
       GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
         path: '/verify',
-        builder: (context, state) =>
-            VerifyOtpScreen(email: state.extra as String? ?? ''),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map) {
+            return VerifyOtpScreen(
+              email: extra['email'] as String? ?? '',
+              signup: extra['signup'] == true,
+            );
+          }
+          return VerifyOtpScreen(email: extra as String? ?? '');
+        },
       ),
       GoRoute(
         path: '/create-family',

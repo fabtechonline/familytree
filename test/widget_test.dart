@@ -8,19 +8,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Sign-in screen shows welcome copy and send button',
+  testWidgets('Sign-in screen shows password login with code fallback',
       (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(home: SignInScreen()),
       ),
     );
-    // Let the OTP controller's async build settle so the button leaves its
-    // initial loading state.
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome to FamilyTree'), findsOneWidget);
-    expect(find.text('Send code'), findsOneWidget);
-    expect(find.byType(TextFormField), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Email me a code instead'), findsOneWidget);
+    expect(find.text('Create an account'), findsOneWidget);
+    // Email + password fields.
+    expect(find.byType(TextField), findsNWidgets(2));
   });
 }
