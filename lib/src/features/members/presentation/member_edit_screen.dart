@@ -14,6 +14,7 @@ import '../application/member_providers.dart';
 import '../data/member_repository.dart';
 import '../domain/member.dart';
 import '../domain/relationship.dart';
+import 'face_capture_screen.dart';
 import 'widgets/member_avatar.dart';
 
 /// The semantic category of a relationship, independent of gender.
@@ -191,6 +192,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
             ListTile(
               leading: const Icon(Icons.photo_camera_rounded),
               title: const Text('Take a photo'),
+              subtitle: const Text('With a face guide'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
@@ -202,9 +204,20 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
         ),
       ),
     );
-    if (source == null) return;
+    if (source == null || !mounted) return;
+
+    if (source == ImageSource.camera) {
+      // Custom camera with an oval face guide; returns processed bytes.
+      final bytes = await Navigator.of(context).push<Uint8List>(
+        MaterialPageRoute(builder: (_) => const FaceCaptureScreen()),
+      );
+      if (bytes == null || !mounted) return;
+      setState(() => _pickedBytes = bytes);
+      return;
+    }
+
     final picked = await ImagePicker().pickImage(
-      source: source,
+      source: ImageSource.gallery,
       maxWidth: 1024,
       maxHeight: 1024,
       imageQuality: 85,

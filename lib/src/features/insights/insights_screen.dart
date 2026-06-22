@@ -27,13 +27,23 @@ class InsightsScreen extends ConsumerWidget {
             _Insight('👪', 'People in the tree', '${s.totalPeople}'),
             _Insight('🌳', 'Generations', '${s.generations}'),
             if (s.commonSurname != null)
-              _Insight('🔤', 'Most common surname', s.commonSurname!),
+              _Insight(
+                  '🔤',
+                  s.commonSurname!.contains('&')
+                      ? 'Top surnames (${s.commonSurnameCount} each)'
+                      : 'Most common surname (×${s.commonSurnameCount})',
+                  s.commonSurname!),
             if (s.commonFirstName != null)
-              _Insight('⭐', 'Most common first name', s.commonFirstName!),
+              _Insight(
+                  '⭐',
+                  s.commonFirstName!.contains('&')
+                      ? 'Top first names (${s.commonFirstNameCount} each)'
+                      : 'Most common first name (×${s.commonFirstNameCount})',
+                  s.commonFirstName!),
             if (s.averageLifespan != null)
               _Insight('🕰️', 'Average lifespan', '${s.averageLifespan} yrs'),
             if (s.oldestLivingName != null)
-              _Insight('🎖️', 'Oldest living',
+              _Insight('🎖️', 'Oldest living (with a birth date)',
                   '${s.oldestLivingName} (${s.oldestLivingAge})'),
             _Insight('👥', 'Biggest generation', '${s.largestGeneration} people'),
             if (s.averageChildren != null)

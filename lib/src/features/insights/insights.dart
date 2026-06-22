@@ -12,7 +12,9 @@ class FamilyInsights {
     required this.oldestLivingName,
     required this.oldestLivingAge,
     required this.commonSurname,
+    required this.commonSurnameCount,
     required this.commonFirstName,
+    required this.commonFirstNameCount,
     required this.largestGeneration,
     required this.birthplaceCount,
     required this.averageChildren,
@@ -23,8 +25,12 @@ class FamilyInsights {
   final int? averageLifespan;
   final String? oldestLivingName;
   final int? oldestLivingAge;
+
+  /// Most-shared surname/first name (or joined ties); null when nothing repeats.
   final String? commonSurname;
+  final int commonSurnameCount;
   final String? commonFirstName;
+  final int commonFirstNameCount;
   final int largestGeneration;
   final int birthplaceCount;
   final double? averageChildren;
@@ -57,7 +63,10 @@ class FamilyInsights {
       }
     }
 
-    String? mode(Iterable<String> values) {
+    // Returns the most-shared value with its count — but only when something
+    // actually repeats (count >= 2). On a tie, all tied values are joined, so
+    // "7 Bux and 7 Khan" reads honestly as "Bux & Khan", not an arbitrary pick.
+    ({String label, int count})? topShared(Iterable<String> values) {
       final counts = <String, int>{};
       for (final v in values) {
         final key = v.trim();
@@ -65,11 +74,18 @@ class FamilyInsights {
         counts[key] = (counts[key] ?? 0) + 1;
       }
       if (counts.isEmpty) return null;
-      return counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+      final max = counts.values.reduce((a, b) => a > b ? a : b);
+      if (max < 2) return null; // nothing repeats — not meaningful
+      final winners = counts.entries
+          .where((e) => e.value == max)
+          .map((e) => e.key)
+          .toList()
+        ..sort();
+      return (label: winners.join(' & '), count: max);
     }
 
-    final commonSurname = mode(g.members.map((m) => m.lastName ?? ''));
-    final commonFirst = mode(g.members.map((m) => m.firstName));
+    final surname = topShared(g.members.map((m) => m.lastName ?? ''));
+    final firstName = topShared(g.members.map((m) => m.firstName));
 
     // Largest generation.
     final perGen = <int, int>{};
@@ -96,8 +112,10 @@ class FamilyInsights {
       averageLifespan: avgLife,
       oldestLivingName: oldestName,
       oldestLivingAge: oldestAge,
-      commonSurname: commonSurname,
-      commonFirstName: commonFirst,
+      commonSurname: surname?.label,
+      commonSurnameCount: surname?.count ?? 0,
+      commonFirstName: firstName?.label,
+      commonFirstNameCount: firstName?.count ?? 0,
       largestGeneration: largestGen,
       birthplaceCount: birthplaces,
       averageChildren: avgChildren,
