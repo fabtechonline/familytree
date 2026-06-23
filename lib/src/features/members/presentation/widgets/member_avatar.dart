@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../avatars/dicebear.dart';
 import '../../domain/member.dart';
 
 /// Circular avatar for a member: their photo if available, otherwise colorful
@@ -27,14 +28,21 @@ class MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasPhoto = (member.photoUrl ?? '').isNotEmpty;
     final color = _color;
+
+    // Priority: illustrated avatar (deliberate choice) → real photo → initials.
+    ImageProvider? image;
+    if (member.avatarConfig != null) {
+      image = NetworkImage(dicebearUrl(member.avatarConfig!, size: (radius * 4).round()));
+    } else if ((member.photoUrl ?? '').isNotEmpty) {
+      image = NetworkImage(member.photoUrl!);
+    }
 
     return CircleAvatar(
       radius: radius,
-      backgroundColor: color.withValues(alpha: hasPhoto ? 0 : 0.18),
-      backgroundImage: hasPhoto ? NetworkImage(member.photoUrl!) : null,
-      child: hasPhoto
+      backgroundColor: color.withValues(alpha: image == null ? 0.18 : 0),
+      backgroundImage: image,
+      child: image != null
           ? null
           : Text(
               member.initials,

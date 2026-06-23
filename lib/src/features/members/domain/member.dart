@@ -19,6 +19,7 @@ class Member {
     this.homeLng,
     this.birthLat,
     this.birthLng,
+    this.avatarConfig,
     this.photoUrl,
     this.linkedUserId,
     this.createdAt,
@@ -43,6 +44,9 @@ class Member {
   final double? homeLng;
   final double? birthLat;
   final double? birthLng;
+
+  /// Illustrated avatar config (DiceBear): {style, seed, options}.
+  final Map<String, dynamic>? avatarConfig;
   final String? photoUrl;
   final String? linkedUserId;
   final DateTime? createdAt;
@@ -85,6 +89,7 @@ class Member {
       homeLng: (map['home_lng'] as num?)?.toDouble(),
       birthLat: (map['birth_lat'] as num?)?.toDouble(),
       birthLng: (map['birth_lng'] as num?)?.toDouble(),
+      avatarConfig: map['avatar_config'] as Map<String, dynamic>?,
       photoUrl: map['photo_url'] as String?,
       linkedUserId: map['linked_user_id'] as String?,
       createdAt: _parseDate(map['created_at']),
@@ -114,6 +119,7 @@ class Member {
       'home_lng': homeLng,
       'birth_lat': birthLat,
       'birth_lng': birthLng,
+      'avatar_config': avatarConfig,
       'photo_url': photoUrl,
     };
   }
@@ -135,6 +141,7 @@ class Member {
     double? homeLng,
     double? birthLat,
     double? birthLng,
+    Map<String, dynamic>? avatarConfig,
     String? photoUrl,
   }) {
     return Member(
@@ -156,6 +163,7 @@ class Member {
       homeLng: homeLng ?? this.homeLng,
       birthLat: birthLat ?? this.birthLat,
       birthLng: birthLng ?? this.birthLng,
+      avatarConfig: avatarConfig ?? this.avatarConfig,
       photoUrl: photoUrl ?? this.photoUrl,
       linkedUserId: linkedUserId,
       createdAt: createdAt,

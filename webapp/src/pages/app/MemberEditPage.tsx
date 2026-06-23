@@ -18,6 +18,7 @@ import {
 } from '../../lib/link-kinds'
 import { PageHeader, Spinner } from '../../components/ui'
 import Avatar from '../../components/Avatar'
+import AvatarBuilder from '../../components/AvatarBuilder'
 import Icon from '../../components/Icon'
 import type { Member, Relationship } from '../../lib/types'
 
@@ -94,6 +95,9 @@ export default function MemberEditPage() {
   // Relationship picker
   const [linkKind, setLinkKind] = useState<LinkKind>('sonOf')
   const [anchorKey, setAnchorKey] = useState<string>('')
+
+  const [avatarOpen, setAvatarOpen] = useState(false)
+  const isPremium = current?.subscription_tier === 'premium'
 
   const hydrated = useRef(false)
   useEffect(() => {
@@ -319,7 +323,16 @@ export default function MemberEditPage() {
             </button>
             <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickFile} />
             <span className="mt-2 text-xs text-ink/45">Tap to add a photo</span>
+            {!isNew && existing && (
+              <button type="button" onClick={() => setAvatarOpen(true)} className="btn-ghost h-9 mt-3 text-sm">
+                <Icon name="user" className="h-4 w-4" /> {existing.avatar_config ? 'Edit' : 'Create'} illustrated avatar
+              </button>
+            )}
           </div>
+        )}
+
+        {avatarOpen && existing && (
+          <AvatarBuilder member={existing} familyId={current!.id} isPremium={isPremium} onClose={() => setAvatarOpen(false)} />
         )}
 
         <div className="grid sm:grid-cols-2 gap-4">

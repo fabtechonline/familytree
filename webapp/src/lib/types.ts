@@ -41,6 +41,13 @@ export interface Family {
   created_at: string
 }
 
+/** Illustrated avatar config (DiceBear). Stored in members.avatar_config. */
+export interface AvatarConfig {
+  style: string // e.g. 'adventurer'
+  seed?: string
+  options?: Record<string, string | number | boolean | string[]>
+}
+
 export interface Member {
   id: string
   family_id: string
@@ -61,7 +68,7 @@ export interface Member {
   birth_lat?: number | null
   birth_lng?: number | null
   photo_url?: string | null
-  avatar_config?: Record<string, unknown> | null
+  avatar_config?: AvatarConfig | null
   linked_user_id?: string | null
   created_by?: string | null
   created_at?: string

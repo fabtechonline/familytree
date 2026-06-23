@@ -14,6 +14,7 @@ import '../application/member_providers.dart';
 import '../data/member_repository.dart';
 import '../domain/member.dart';
 import '../domain/relationship.dart';
+import '../../avatars/presentation/avatar_builder_screen.dart';
 import '../../map/data/geocoding.dart';
 import 'face_capture_screen.dart';
 import 'widgets/member_avatar.dart';
@@ -643,6 +644,17 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
                   onTap: _pickPhoto,
                 ),
               ),
+              if (widget.isEditing && existing != null)
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => AvatarBuilderScreen(member: existing))),
+                    icon: const Icon(Icons.face_retouching_natural_rounded, size: 18),
+                    label: Text(existing.avatarConfig != null
+                        ? 'Edit illustrated avatar'
+                        : 'Create illustrated avatar'),
+                  ),
+                ),
               const SizedBox(height: AppSpacing.lg),
             ],
             TextFormField(

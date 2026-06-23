@@ -44,6 +44,11 @@ class MemberRepository {
     return Member.fromMap(row);
   }
 
+  /// Set or clear (null) a member's illustrated avatar config.
+  Future<void> setAvatarConfig(String memberId, Map<String, dynamic>? config) async {
+    await _client.from('members').update({'avatar_config': config}).eq('id', memberId);
+  }
+
   Future<void> deleteMember(String id) async {
     await _client.from('members').delete().eq('id', id);
   }

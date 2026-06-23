@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { useFamily } from '../../app/FamilyProvider'
 import { useMembers, useRelationships } from '../../data/queries'
 import { fullName, initials, avatarColor } from '../../lib/member-utils'
+import { memberImageUrl } from '../../lib/avatar'
 import { PageHeader, Spinner, EmptyState } from '../../components/ui'
 import type { Member, Relationship } from '../../lib/types'
 
@@ -37,8 +38,9 @@ function spread(points: { id: string; lat: number; lng: number }[]): Map<string,
 }
 
 function avatarIcon(m: Member, ringColor: string): L.DivIcon {
-  const inner = m.photo_url
-    ? `<img src="${m.photo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:9999px"/>`
+  const img = memberImageUrl(m, 76)
+  const inner = img
+    ? `<img src="${img}" style="width:100%;height:100%;object-fit:cover;border-radius:9999px"/>`
     : `<div style="width:100%;height:100%;border-radius:9999px;display:grid;place-items:center;background:${avatarColor(m.id)};color:#fff;font-weight:700;font-size:13px">${initials(m)}</div>`
   return L.divIcon({
     className: 'riza-pin',
