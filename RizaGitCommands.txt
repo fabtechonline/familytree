@@ -1,0 +1,27 @@
+The workflow
+On whichever machine you sit down at:
+
+
+git pull          # get the other machine's latest
+
+# ...work, then...
+
+git add -A && git commit -m "..." && git push
+
+The golden rule: pull before you start, push when you finish. As long as you don't edit the same lines on both machines without pushing in between, git merges cleanly.
+
+
+What git does NOT carry (keep these in sync yourself)
+
+These are gitignored, so each machine needs its own copy:
+
+env.json and FamilyTreeDetails.txt — your secrets. Copy once to the Mac (USB/AirDrop); they rarely change.
+
+build/, ios/Pods/, .dart_tool/ — generated per-machine. Never commit them; just run flutter pub get (and pod install on the Mac) after a fresh pull if dependencies changed.
+.agent-memory/ — your agent context (already on the USB).
+
+
+One real friction worth fixing: line endings
+You saw LF will be replaced by CRLF warnings on Windows. Without a rule, Windows tends to write CRLF and the Mac LF, which can create noisy "whole file changed" diffs that look like conflicts. The fix is a committed .gitattributes that normalizes everyone to LF — set it once and both machines behave.
+
+Want me to add a .gitattributes now so the Mac and Windows never fight over line endings?
