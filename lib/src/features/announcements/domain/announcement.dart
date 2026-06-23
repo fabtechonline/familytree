@@ -46,7 +46,14 @@ class AnnouncementType {
     AnnouncementType('birthday', 'Birthday', '🎂'),
     AnnouncementType('birth', 'New baby', '👶'),
     AnnouncementType('wedding', 'Wedding', '💍'),
+    AnnouncementType('anniversary', 'Anniversary', '💞'),
+    AnnouncementType('engagement', 'Engagement', '💐'),
     AnnouncementType('graduation', 'Graduation', '🎓'),
+    AnnouncementType('new_job', 'New job', '💼'),
+    AnnouncementType('new_home', 'New home', '🏡'),
+    AnnouncementType('achievement', 'Achievement', '🏆'),
+    AnnouncementType('reunion', 'Reunion', '🎉'),
+    AnnouncementType('travel', 'Travel', '✈️'),
     AnnouncementType('memorial', 'In memoriam', '🕊️'),
   ];
 

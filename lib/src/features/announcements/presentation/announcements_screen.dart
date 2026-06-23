@@ -123,10 +123,13 @@ class _ComposeSheetState extends ConsumerState<_ComposeSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    // Keyboard inset when typing; safe-area inset (home indicator / gesture bar)
+    // so the "Post to family" button is never hidden behind the device nav bar.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-          AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg + bottom),
+      padding: EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg,
+          AppSpacing.lg + keyboard + safeBottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

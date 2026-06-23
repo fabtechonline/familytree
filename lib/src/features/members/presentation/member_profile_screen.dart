@@ -172,6 +172,17 @@ class _ProfileBody extends StatelessWidget {
         if ((member.birthPlace ?? '').isNotEmpty)
           _InfoRow(
               icon: Icons.place_outlined, label: 'Born in', value: member.birthPlace!),
+        if ((member.occupation ?? '').isNotEmpty)
+          _InfoRow(
+              icon: Icons.work_outline_rounded,
+              label: 'Occupation',
+              value: member.occupation!),
+        if ((member.phone ?? '').isNotEmpty)
+          _InfoRow(
+              icon: Icons.phone_outlined, label: 'Phone', value: member.phone!),
+        if ((member.address ?? '').isNotEmpty)
+          _InfoRow(
+              icon: Icons.home_outlined, label: 'Address', value: member.address!),
         if ((member.bio ?? '').isNotEmpty) ...[
           const SizedBox(height: AppSpacing.md),
           Text('About',

@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-pill px-6 h-12 font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-brand text-white shadow-soft hover:bg-brand-600;
+  }
+  .btn-ghost {
+    @apply btn bg-white text-ink border border-black/10 hover:border-brand/40 hover:text-brand-700;
+  }
+  .card {
+    @apply rounded-2xl bg-white border border-black/5 shadow-card;
+  }
+  .input {
+    @apply w-full rounded-xl border border-black/10 bg-white px-4 h-12 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition;
+  }
+  .container-x {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+}

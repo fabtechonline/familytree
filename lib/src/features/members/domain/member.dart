@@ -12,6 +12,13 @@ class Member {
     this.isLiving = true,
     this.birthPlace,
     this.bio,
+    this.phone,
+    this.address,
+    this.occupation,
+    this.homeLat,
+    this.homeLng,
+    this.birthLat,
+    this.birthLng,
     this.photoUrl,
     this.linkedUserId,
     this.createdAt,
@@ -29,6 +36,13 @@ class Member {
   final bool isLiving;
   final String? birthPlace;
   final String? bio;
+  final String? phone;
+  final String? address;
+  final String? occupation;
+  final double? homeLat;
+  final double? homeLng;
+  final double? birthLat;
+  final double? birthLng;
   final String? photoUrl;
   final String? linkedUserId;
   final DateTime? createdAt;
@@ -64,6 +78,13 @@ class Member {
       isLiving: map['is_living'] as bool? ?? true,
       birthPlace: map['birth_place'] as String?,
       bio: map['bio'] as String?,
+      phone: map['phone'] as String?,
+      address: map['address'] as String?,
+      occupation: map['occupation'] as String?,
+      homeLat: (map['home_lat'] as num?)?.toDouble(),
+      homeLng: (map['home_lng'] as num?)?.toDouble(),
+      birthLat: (map['birth_lat'] as num?)?.toDouble(),
+      birthLng: (map['birth_lng'] as num?)?.toDouble(),
       photoUrl: map['photo_url'] as String?,
       linkedUserId: map['linked_user_id'] as String?,
       createdAt: _parseDate(map['created_at']),
@@ -86,6 +107,13 @@ class Member {
       'is_living': isLiving,
       'birth_place': birthPlace,
       'bio': bio,
+      'phone': phone,
+      'address': address,
+      'occupation': occupation,
+      'home_lat': homeLat,
+      'home_lng': homeLng,
+      'birth_lat': birthLat,
+      'birth_lng': birthLng,
       'photo_url': photoUrl,
     };
   }
@@ -100,6 +128,13 @@ class Member {
     bool? isLiving,
     String? birthPlace,
     String? bio,
+    String? phone,
+    String? address,
+    String? occupation,
+    double? homeLat,
+    double? homeLng,
+    double? birthLat,
+    double? birthLng,
     String? photoUrl,
   }) {
     return Member(
@@ -114,6 +149,13 @@ class Member {
       isLiving: isLiving ?? this.isLiving,
       birthPlace: birthPlace ?? this.birthPlace,
       bio: bio ?? this.bio,
+      phone: phone ?? this.phone,
+      address: address ?? this.address,
+      occupation: occupation ?? this.occupation,
+      homeLat: homeLat ?? this.homeLat,
+      homeLng: homeLng ?? this.homeLng,
+      birthLat: birthLat ?? this.birthLat,
+      birthLng: birthLng ?? this.birthLng,
       photoUrl: photoUrl ?? this.photoUrl,
       linkedUserId: linkedUserId,
       createdAt: createdAt,

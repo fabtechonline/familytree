@@ -180,6 +180,12 @@ class FamilyDashboardScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.md),
             _ViewTreeCard(onTap: () => context.push('/tree')),
             const SizedBox(height: AppSpacing.sm),
+            _QuickLinkCard(
+              icon: Icons.public_rounded,
+              label: 'Family map',
+              onTap: () => context.push('/map'),
+            ),
+            const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
                 Expanded(

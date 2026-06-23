@@ -14,6 +14,7 @@ import '../application/member_providers.dart';
 import '../data/member_repository.dart';
 import '../domain/member.dart';
 import '../domain/relationship.dart';
+import '../../map/data/geocoding.dart';
 import 'face_capture_screen.dart';
 import 'widgets/member_avatar.dart';
 
@@ -133,6 +134,9 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
   final _maidenName = TextEditingController();
   final _birthPlace = TextEditingController();
   final _bio = TextEditingController();
+  final _phone = TextEditingController();
+  final _address = TextEditingController();
+  final _occupation = TextEditingController();
 
   String? _gender;
   bool _isLiving = true;
@@ -160,6 +164,9 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     _maidenName.dispose();
     _birthPlace.dispose();
     _bio.dispose();
+    _phone.dispose();
+    _address.dispose();
+    _occupation.dispose();
     super.dispose();
   }
 
@@ -169,6 +176,9 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     _maidenName.text = m.maidenName ?? '';
     _birthPlace.text = m.birthPlace ?? '';
     _bio.text = m.bio ?? '';
+    _phone.text = m.phone ?? '';
+    _address.text = m.address ?? '';
+    _occupation.text = m.occupation ?? '';
     _gender = m.gender;
     _isLiving = m.isLiving;
     _birthDate = m.birthDate;
@@ -264,6 +274,9 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
       'is_living': _isLiving,
       'birth_place': clean(_birthPlace),
       'bio': clean(_bio),
+      'phone': clean(_phone),
+      'address': clean(_address),
+      'occupation': clean(_occupation),
     };
   }
 
@@ -310,6 +323,35 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     setState(() => _submitting = true);
     final repo = ref.read(memberRepositoryProvider);
 
+    // Geocode home/birthplace for the Family Map (best effort). Preserve existing
+    // coords unless the place text changed; clear them if the field was emptied.
+    final current =
+        existing.where((m) => m.id == widget.memberId).firstOrNull;
+    final addr = _address.text.trim();
+    final birthPlace = _birthPlace.text.trim();
+    double? homeLat = current?.homeLat, homeLng = current?.homeLng;
+    double? birthLat = current?.birthLat, birthLng = current?.birthLng;
+    if (addr.isEmpty) {
+      homeLat = null;
+      homeLng = null;
+    } else if (addr != (current?.address ?? '')) {
+      final g = await geocode(addr);
+      if (g != null) {
+        homeLat = g.lat;
+        homeLng = g.lng;
+      }
+    }
+    if (birthPlace.isEmpty) {
+      birthLat = null;
+      birthLng = null;
+    } else if (birthPlace != (current?.birthPlace ?? '')) {
+      final g = await geocode(birthPlace);
+      if (g != null) {
+        birthLat = g.lat;
+        birthLng = g.lng;
+      }
+    }
+
     var draft = Member(
       id: widget.memberId ?? '',
       familyId: familyId,
@@ -321,9 +363,16 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
       birthDate: _birthDate,
       deathDate: _isLiving ? null : _deathDate,
       isLiving: _isLiving,
-      birthPlace:
-          _birthPlace.text.trim().isEmpty ? null : _birthPlace.text.trim(),
+      birthPlace: birthPlace.isEmpty ? null : birthPlace,
       bio: _bio.text.trim().isEmpty ? null : _bio.text.trim(),
+      phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+      address: addr.isEmpty ? null : addr,
+      occupation:
+          _occupation.text.trim().isEmpty ? null : _occupation.text.trim(),
+      homeLat: homeLat,
+      homeLng: homeLng,
+      birthLat: birthLat,
+      birthLng: birthLng,
       photoUrl: _photoUrl,
     );
 
@@ -660,6 +709,32 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
               decoration: const InputDecoration(
                   labelText: 'Birthplace',
                   prefixIcon: Icon(Icons.place_outlined)),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _occupation,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                  labelText: 'Occupation',
+                  prefixIcon: Icon(Icons.work_outline_rounded)),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                  labelText: 'Phone number',
+                  prefixIcon: Icon(Icons.phone_outlined)),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _address,
+              textCapitalization: TextCapitalization.words,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                  labelText: 'Address',
+                  alignLabelWithHint: true,
+                  prefixIcon: Icon(Icons.home_outlined)),
             ),
             const SizedBox(height: AppSpacing.md),
             TextFormField(
