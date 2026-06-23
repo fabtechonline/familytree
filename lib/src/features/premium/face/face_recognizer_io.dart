@@ -1,10 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-// TEMP(sim): google_mlkit_face_detection disabled for iOS Simulator on Apple
-// Silicon (no arm64 simulator slice). Face detection falls back to using the
-// whole image. Re-enable the import + detector for device/release builds.
-// import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -14,6 +11,9 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 /// the device.
 class FaceRecognizer {
   Interpreter? _interpreter;
+  final FaceDetector _detector = FaceDetector(
+    options: FaceDetectorOptions(performanceMode: FaceDetectorMode.accurate),
+  );
 
   Future<void> _ensureModel() async {
     _interpreter ??=
@@ -23,15 +23,23 @@ class FaceRecognizer {
   /// 192-d embedding for the largest face in [path], or null if no face found.
   Future<List<double>?> embedFromFile(String path) async {
     await _ensureModel();
+    final faces = await _detector.processImage(InputImage.fromFilePath(path));
+    if (faces.isEmpty) return null;
 
     var decoded = img.decodeImage(await File(path).readAsBytes());
     if (decoded == null) return null;
     decoded = img.bakeOrientation(decoded);
 
-    // TEMP(sim): ML Kit face detection disabled on the iOS Simulator. Use the
-    // whole image as the "face" region. Restore the FaceDetector-based crop
-    // (largest bounding box) for device/release builds.
-    final face = img.copyResize(decoded, width: 112, height: 112);
+    faces.sort((a, b) => (b.boundingBox.width * b.boundingBox.height)
+        .compareTo(a.boundingBox.width * a.boundingBox.height));
+    final box = faces.first.boundingBox;
+    final x = box.left.clamp(0, decoded.width - 1).toInt();
+    final y = box.top.clamp(0, decoded.height - 1).toInt();
+    final w = box.width.clamp(1, decoded.width - x).toInt();
+    final h = box.height.clamp(1, decoded.height - y).toInt();
+
+    final crop = img.copyCrop(decoded, x: x, y: y, width: w, height: h);
+    final face = img.copyResize(crop, width: 112, height: 112);
     return _embed(face);
   }
 
@@ -87,6 +95,6 @@ class FaceRecognizer {
 
   void dispose() {
     _interpreter?.close();
-    // TEMP(sim): _detector.close() removed while ML Kit is disabled.
+    _detector.close();
   }
 }
