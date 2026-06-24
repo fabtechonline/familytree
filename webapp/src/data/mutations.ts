@@ -76,12 +76,17 @@ export async function deleteRelationship(id: string): Promise<void> {
   if (error) throw error
 }
 
-/** Make newMemberId a sibling of siblingOfId by sharing the same parents. */
+/**
+ * Make newMemberId a sibling of siblingOfId by sharing the same parents.
+ * Returns the number of parent edges created — 0 means siblingOfId has no
+ * recorded parents, so no sibling link could be made (the caller should add a
+ * shared parent).
+ */
 export async function linkSiblingByParents(input: {
   family_id: string
   newMemberId: string
   siblingOfId: string
-}): Promise<void> {
+}): Promise<number> {
   const { data: rows, error } = await supabase
     .from('relationships')
     .select('from_member')
@@ -89,7 +94,8 @@ export async function linkSiblingByParents(input: {
     .eq('type', 'parent')
     .eq('to_member', input.siblingOfId)
   if (error) throw error
-  for (const row of rows ?? []) {
+  const list = rows ?? []
+  for (const row of list) {
     await addRelationship({
       family_id: input.family_id,
       from_member: (row as { from_member: string }).from_member,
@@ -97,6 +103,37 @@ export async function linkSiblingByParents(input: {
       type: 'parent',
     })
   }
+  return list.length
+}
+
+/**
+ * Create a parent and link every id in childIds to them as a child. Used to
+ * bind siblings who don't yet share a recorded parent. Returns the parent id.
+ */
+export async function addParentForChildren(input: {
+  family_id: string
+  first_name: string
+  last_name?: string | null
+  gender?: string | null
+  is_living?: boolean
+  childIds: string[]
+}): Promise<string> {
+  const parent = await createMember({
+    family_id: input.family_id,
+    first_name: input.first_name,
+    last_name: input.last_name ?? null,
+    gender: input.gender ?? null,
+    is_living: input.is_living ?? true,
+  })
+  for (const childId of input.childIds) {
+    await addRelationship({
+      family_id: input.family_id,
+      from_member: parent.id,
+      to_member: childId,
+      type: 'parent',
+    })
+  }
+  return parent.id
 }
 
 /** Add a photo memory: upload via the edge function, then record the row. */

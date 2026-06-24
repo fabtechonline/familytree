@@ -6,7 +6,7 @@ import { useFamily } from '../../app/FamilyProvider'
 import { useMembers, useRelationships } from '../../data/queries'
 import {
   createMember, updateMember, deleteMember,
-  addRelationship, deleteRelationship, linkSiblingByParents, submitSuggestion,
+  addRelationship, addParentForChildren, deleteRelationship, linkSiblingByParents, submitSuggestion,
   type MemberInput,
 } from '../../data/mutations'
 import { uploadMemberPhoto } from '../../lib/upload'
@@ -178,7 +178,25 @@ export default function MemberEditPage() {
     } else if (cat === 'child') {
       for (const parentId of ids) await addRelationship({ family_id: familyId, from_member: parentId, to_member: memberId, type: 'parent' })
     } else if (cat === 'sibling') {
-      await linkSiblingByParents({ family_id: familyId, newMemberId: memberId, siblingOfId: ids[0] })
+      // Siblings are derived from shared parents. If the chosen relative has no
+      // parent on record, nothing can be linked — offer to create the shared
+      // parent instead of failing silently.
+      const linked = await linkSiblingByParents({ family_id: familyId, newMemberId: memberId, siblingOfId: ids[0] })
+      if (linked === 0) {
+        const anchorName = opt.label ?? 'this person'
+        const name = window.prompt(
+          `Siblings are linked through a shared parent, but ${anchorName} has no parent on record yet.\n\n` +
+            `Enter the shared parent's full name to create them and link both as siblings (or press Cancel):`,
+        )
+        if (name && name.trim()) {
+          const parts = name.trim().split(/\s+/)
+          const first_name = parts.shift() as string
+          const last_name = parts.join(' ') || form.last_name.trim() || null
+          await addParentForChildren({ family_id: familyId, first_name, last_name, childIds: [ids[0], memberId] })
+        } else {
+          window.alert('No sibling link was added — siblings must share a parent. Add a parent first, then try again.')
+        }
+      }
     }
   }
 
