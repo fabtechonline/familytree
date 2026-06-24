@@ -101,6 +101,25 @@ export default function AppShell() {
   if (families.length === 0)
     return <Navigate to={isSuper ? '/app/admin' : '/app/create-family'} replace />
 
+  // Suspended families are read-blocked: show a notice instead of the app.
+  if (current?.is_suspended && !isSuper) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-canvas px-6 text-center">
+        <div className="card max-w-md p-8">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-coral/10 text-coral">
+            <Icon name="shield" className="h-6 w-6" />
+          </div>
+          <h1 className="text-lg font-bold text-ink">Family access suspended</h1>
+          <p className="mt-2 text-sm text-ink/60">
+            Access to <b>{current.name}</b> has been suspended by the Riza team. Please contact
+            {' '}<a className="text-brand-700" href="mailto:fabtechonline@gmail.com">support</a> if you believe this is a mistake.
+          </p>
+          <button onClick={signOut} className="btn-ghost mt-5">Sign out</button>
+        </div>
+      </div>
+    )
+  }
+
   const items = NAV.filter((n) => (!n.adminOnly || admin) && (!n.superOnly || isSuper))
 
   const handleSignOut = async () => {
