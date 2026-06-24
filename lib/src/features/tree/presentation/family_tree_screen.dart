@@ -6,11 +6,16 @@ import '../../../config/supabase_providers.dart';
 import '../../../theme/app_theme.dart';
 import '../../family/application/family_providers.dart';
 import '../../family/domain/family.dart';
+import '../../members/application/member_providers.dart';
 import '../../members/domain/member.dart';
 import '../../members/presentation/widgets/member_avatar.dart';
 import '../application/tree_providers.dart';
+import '../domain/family_graph.dart';
 import '../domain/lineage.dart';
 import '../domain/tree_layout.dart';
+
+/// Tree view modes available on mobile (Wide/Fan are web-only for now).
+enum TreeViewMode { tree, focus }
 
 /// The visual family tree: a pan/zoom canvas of member cards connected by
 /// parent→child and spouse links. Tapping a node opens an action menu, and
@@ -25,8 +30,64 @@ class FamilyTreeScreen extends ConsumerStatefulWidget {
 class _FamilyTreeScreenState extends ConsumerState<FamilyTreeScreen> {
   String? _lineageOf;
   bool _full = false;
+  TreeViewMode _mode = TreeViewMode.tree;
+  String? _focusId;
+  final Set<String> _collapsed = {};
 
-  void _showNodeMenu(Family family, Member member, String? myUid) {
+  Set<String> _descendantsOf(FamilyGraph g, String id) {
+    final out = <String>{};
+    final stack = [...(g.childrenOf[id] ?? const <String>[])];
+    while (stack.isNotEmpty) {
+      final c = stack.removeLast();
+      if (!out.add(c)) continue;
+      stack.addAll(g.childrenOf[c] ?? const <String>[]);
+    }
+    return out;
+  }
+
+  Set<String> _hourglassOf(FamilyGraph g, String id) {
+    final out = <String>{id};
+    final up = [...(g.parentsOf[id] ?? const <String>[])];
+    while (up.isNotEmpty) {
+      final p = up.removeLast();
+      if (out.add(p)) up.addAll(g.parentsOf[p] ?? const <String>[]);
+    }
+    out.addAll(_descendantsOf(g, id));
+    for (final m in [...out]) {
+      out.addAll(g.spousesOf[m] ?? const <String>[]);
+    }
+    return out;
+  }
+
+  /// The member subset to render given the current mode + collapsed branches.
+  List<Member> _visibleMembers(FamilyGraph g) {
+    Iterable<Member> base = g.members;
+    if (_mode == TreeViewMode.focus && _focusId != null) {
+      final set = _hourglassOf(g, _focusId!);
+      base = base.where((m) => set.contains(m.id));
+    }
+    final hidden = <String>{};
+    for (final id in _collapsed) {
+      hidden.addAll(_descendantsOf(g, id));
+    }
+    return base.where((m) => !hidden.contains(m.id)).toList();
+  }
+
+  Map<String, int> _hiddenCounts(FamilyGraph g, List<Member> visible) {
+    final visibleIds = {for (final m in visible) m.id};
+    final counts = <String, int>{};
+    for (final id in _collapsed) {
+      if (!visibleIds.contains(id)) continue;
+      final n = _descendantsOf(g, id).length;
+      if (n > 0) counts[id] = n;
+    }
+    return counts;
+  }
+
+  void _showNodeMenu(
+      Family family, Member member, String? myUid, FamilyGraph graph) {
+    final hasChildren = (graph.childrenOf[member.id] ?? const []).isNotEmpty;
+    final isCollapsed = _collapsed.contains(member.id);
     final canEditThis = family.myRole.canEdit ||
         (family.myRole.isRelative &&
             myUid != null &&
@@ -94,6 +155,34 @@ class _FamilyTreeScreenState extends ConsumerState<FamilyTreeScreen> {
                 });
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.center_focus_strong_rounded),
+              title: const Text('Focus on this person'),
+              subtitle: const Text('Show only ancestors + descendants'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                setState(() {
+                  _mode = TreeViewMode.focus;
+                  _focusId = member.id;
+                });
+              },
+            ),
+            if (hasChildren)
+              ListTile(
+                leading: Icon(isCollapsed
+                    ? Icons.unfold_more_rounded
+                    : Icons.unfold_less_rounded),
+                title: Text(isCollapsed ? 'Expand branch' : 'Collapse branch'),
+                subtitle: const Text('Hide/show this person’s descendants'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  setState(() {
+                    isCollapsed
+                        ? _collapsed.remove(member.id)
+                        : _collapsed.add(member.id);
+                  });
+                },
+              ),
           ],
         ),
       ),
@@ -114,54 +203,100 @@ class _FamilyTreeScreenState extends ConsumerState<FamilyTreeScreen> {
       body: graphAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Could not load tree: $e')),
-        data: (graph) {
-          final layout = TreeLayoutEngine.build(graph);
-          if (layout.isEmpty) return const _EmptyTree();
+        data: (fullGraph) {
+          final rels =
+              ref.watch(relationshipsProvider(family.id)).value ?? const [];
+          // Default the focus to "me" (or first member) when entering Focus.
+          if (_mode == TreeViewMode.focus &&
+              _focusId == null &&
+              fullGraph.members.isNotEmpty) {
+            final mine = fullGraph.members.firstWhere(
+                (m) => m.linkedUserId == myUid,
+                orElse: () => fullGraph.members.first);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _focusId == null) {
+                setState(() => _focusId = mine.id);
+              }
+            });
+          }
 
+          final visible = _visibleMembers(fullGraph);
+          final graph = FamilyGraph.build(visible, rels);
+          final layout = TreeLayoutEngine.build(graph);
           final lineage = _lineageOf == null
               ? null
               : computeLineage(graph, _lineageOf!, full: _full);
+          final hidden = _hiddenCounts(fullGraph, visible);
 
           return Stack(
             children: [
-              InteractiveViewer(
-                constrained: false,
-                boundaryMargin: const EdgeInsets.all(400),
-                minScale: 0.2,
-                maxScale: 2.5,
-                child: SizedBox(
-                  width: layout.size.width,
-                  height: layout.size.height,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: CustomPaint(
-                          painter: _EdgePainter(
-                            layout: layout,
-                            scheme: Theme.of(context).colorScheme,
-                            lineage: lineage,
+              if (layout.isEmpty)
+                const _EmptyTree()
+              else
+                InteractiveViewer(
+                  constrained: false,
+                  boundaryMargin: const EdgeInsets.all(400),
+                  minScale: 0.2,
+                  maxScale: 2.5,
+                  child: SizedBox(
+                    width: layout.size.width,
+                    height: layout.size.height,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _EdgePainter(
+                              layout: layout,
+                              scheme: Theme.of(context).colorScheme,
+                              lineage: lineage,
+                            ),
                           ),
                         ),
-                      ),
-                      for (final node in layout.nodes)
-                        Positioned(
-                          left: node.center.dx - layout.nodeSize.width / 2,
-                          top: node.center.dy - layout.nodeSize.height / 2,
-                          width: layout.nodeSize.width,
-                          height: layout.nodeSize.height,
-                          child: _TreeNodeCard(
-                            member: node.member,
-                            badge: lineage?.labelFor(node.member.id),
-                            selected: node.member.id == _lineageOf,
-                            highlighted:
-                                lineage?.members.contains(node.member.id) ?? false,
-                            dimmed: lineage != null &&
-                                !(lineage.members.contains(node.member.id)),
-                            onTap: () =>
-                                _showNodeMenu(family, node.member, myUid),
+                        for (final node in layout.nodes)
+                          Positioned(
+                            left: node.center.dx - layout.nodeSize.width / 2,
+                            top: node.center.dy - layout.nodeSize.height / 2,
+                            width: layout.nodeSize.width,
+                            height: layout.nodeSize.height,
+                            child: _TreeNodeCard(
+                              member: node.member,
+                              badge: lineage?.labelFor(node.member.id),
+                              selected: node.member.id == _lineageOf ||
+                                  node.member.id == _focusId,
+                              highlighted: lineage?.members
+                                      .contains(node.member.id) ??
+                                  false,
+                              dimmed: lineage != null &&
+                                  !(lineage.members.contains(node.member.id)),
+                              onTap: () => _showNodeMenu(
+                                  family, node.member, myUid, fullGraph),
+                            ),
                           ),
-                        ),
-                    ],
+                        for (final node in layout.nodes)
+                          if ((hidden[node.member.id] ?? 0) > 0)
+                            Positioned(
+                              left: node.center.dx - 18,
+                              top: node.center.dy +
+                                  layout.nodeSize.height / 2 -
+                                  6,
+                              child: _CollapseChip(
+                                count: hidden[node.member.id]!,
+                                onTap: () => setState(
+                                    () => _collapsed.remove(node.member.id)),
+                              ),
+                            ),
+                      ],
+                    ),
+                  ),
+                ),
+              Positioned(
+                top: AppSpacing.md,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: _ViewSwitcher(
+                    mode: _mode,
+                    onChanged: (m) => setState(() => _mode = m),
                   ),
                 ),
               ),
@@ -175,6 +310,19 @@ class _FamilyTreeScreenState extends ConsumerState<FamilyTreeScreen> {
                     full: _full,
                     onToggleFull: () => setState(() => _full = !_full),
                     onClear: () => setState(() => _lineageOf = null),
+                  ),
+                )
+              else if (_mode == TreeViewMode.focus && _focusId != null)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _FocusBar(
+                    name: fullGraph.byId[_focusId!]?.firstName ?? 'this person',
+                    onClear: () => setState(() {
+                      _mode = TreeViewMode.tree;
+                      _focusId = null;
+                    }),
                   ),
                 ),
             ],
@@ -451,6 +599,115 @@ class _LineageBar extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ViewSwitcher extends StatelessWidget {
+  const _ViewSwitcher({required this.mode, required this.onChanged});
+  final TreeViewMode mode;
+  final ValueChanged<TreeViewMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget seg(TreeViewMode m, String label, IconData icon) {
+      final sel = mode == m;
+      return GestureDetector(
+        onTap: () => onChanged(m),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: sel ? theme.colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadii.pill),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon,
+                size: 16,
+                color: sel ? Colors.white : theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(label,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color:
+                        sel ? Colors.white : theme.colorScheme.onSurfaceVariant)),
+          ]),
+        ),
+      );
+    }
+
+    return Material(
+      elevation: 2,
+      borderRadius: BorderRadius.circular(AppRadii.pill),
+      color: theme.colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          seg(TreeViewMode.tree, 'Tree', Icons.account_tree_rounded),
+          seg(TreeViewMode.focus, 'Focus', Icons.center_focus_strong_rounded),
+        ]),
+      ),
+    );
+  }
+}
+
+class _FocusBar extends StatelessWidget {
+  const _FocusBar({required this.name, required this.onClear});
+  final String name;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Card(
+          color: theme.colorScheme.surface,
+          elevation: 3,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+            child: Row(children: [
+              const Icon(Icons.center_focus_strong_rounded,
+                  color: AppColors.accentSun),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Focused on $name',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              IconButton(
+                tooltip: 'Back to full tree',
+                icon: const Icon(Icons.close_rounded),
+                onPressed: onClear,
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CollapseChip extends StatelessWidget {
+  const _CollapseChip({required this.count, required this.onTap});
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+        ),
+        child: Text('+$count',
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
       ),
     );
   }
