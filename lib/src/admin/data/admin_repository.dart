@@ -121,6 +121,47 @@ class AuditEntry {
       );
 }
 
+class AdminPlan {
+  const AdminPlan({
+    required this.key,
+    required this.label,
+    required this.tier,
+    required this.priceCents,
+    required this.interval,
+    required this.isActive,
+    this.paystackPlanCode,
+    this.storeProductId,
+  });
+  final String key;
+  final String label;
+  final String tier;
+  final int priceCents;
+  final String interval;
+  final bool isActive;
+  final String? paystackPlanCode;
+  final String? storeProductId;
+
+  factory AdminPlan.fromMap(Map<String, dynamic> m) => AdminPlan(
+        key: m['key'] as String,
+        label: m['label'] as String,
+        tier: m['tier'] as String? ?? 'free',
+        priceCents: (m['price_cents'] as num?)?.toInt() ?? 0,
+        interval: m['interval'] as String? ?? 'none',
+        isActive: m['is_active'] as bool? ?? true,
+        paystackPlanCode: m['paystack_plan_code'] as String?,
+        storeProductId: m['store_product_id'] as String?,
+      );
+}
+
+class AppSetting {
+  const AppSetting({required this.key, required this.value});
+  final String key;
+  final dynamic value;
+
+  factory AppSetting.fromMap(Map<String, dynamic> m) =>
+      AppSetting(key: m['key'] as String, value: m['value']);
+}
+
 class AdminRepository {
   AdminRepository(this._client);
   final SupabaseClient _client;
@@ -201,6 +242,43 @@ class AdminRepository {
         params: {'p_family': familyId, 'p_limit': limit});
   }
 
+  Future<List<AdminPlan>> plans() async {
+    final rows = await _client.from('plans').select().order('sort');
+    return (rows as List)
+        .map((r) => AdminPlan.fromMap(r as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> updatePlan(String key,
+      {String? label,
+      int? priceCents,
+      String? interval,
+      bool? isActive,
+      String? paystackPlanCode,
+      String? storeProductId}) async {
+    await _client.rpc('admin_update_plan', params: {
+      'p_key': key,
+      'p_label': label,
+      'p_price_cents': priceCents,
+      'p_interval': interval,
+      'p_is_active': isActive,
+      'p_paystack_plan_code': paystackPlanCode,
+      'p_store_product_id': storeProductId,
+    });
+  }
+
+  Future<List<AppSetting>> settings() async {
+    final rows = await _client.rpc('admin_get_settings');
+    return (rows as List)
+        .map((r) => AppSetting.fromMap(r as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> setSetting(String key, dynamic value) async {
+    await _client.rpc('admin_set_setting',
+        params: {'p_key': key, 'p_value': value});
+  }
+
   Future<List<AuditEntry>> audit({int limit = 100}) async {
     final rows = await _client
         .from('audit_log')
@@ -235,3 +313,9 @@ final adminFamiliesProvider =
 
 final adminAuditProvider =
     FutureProvider<List<AuditEntry>>((ref) => ref.watch(adminRepositoryProvider).audit());
+
+final adminPlansProvider =
+    FutureProvider<List<AdminPlan>>((ref) => ref.watch(adminRepositoryProvider).plans());
+
+final adminSettingsProvider =
+    FutureProvider<List<AppSetting>>((ref) => ref.watch(adminRepositoryProvider).settings());
