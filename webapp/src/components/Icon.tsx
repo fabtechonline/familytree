@@ -23,6 +23,7 @@ export const ICONS = {
   trash: 'M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14ZM10 11v6M14 11v6',
   map: 'M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Zm0 0v15m6-12v15',
   globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.5-2.3 4-5.6 4-9s-1.5-6.7-4-9m0 18c-2.5-2.3-4-5.6-4-9s1.5-6.7 4-9M3.5 9h17M3.5 15h17',
+  info: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-9v4m0-8h.01',
 } as const
 
 export type IconName = keyof typeof ICONS

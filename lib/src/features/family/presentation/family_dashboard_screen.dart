@@ -135,6 +135,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
                   context.push('/suggestions');
                 case 'set-password':
                   _setPasswordDialog(context, ref);
+                case 'about':
+                  context.push('/about');
               }
             },
             itemBuilder: (context) => [
@@ -151,6 +153,7 @@ class FamilyDashboardScreen extends ConsumerWidget {
               const PopupMenuItem(value: 'new-family', child: Text('New family')),
               const PopupMenuItem(
                   value: 'set-password', child: Text('Set / change password')),
+              const PopupMenuItem(value: 'about', child: Text('About')),
               const PopupMenuItem(value: 'signout', child: Text('Sign out')),
             ],
           ),

@@ -139,6 +139,15 @@ export default function AppShell() {
       >
         <Icon name="user" className="h-5 w-5" /> Account
       </NavLink>
+      <NavLink
+        to="/app/about"
+        onClick={() => setMobileOpen(false)}
+        className={({ isActive }) =>
+          `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${isActive ? 'bg-brand-50 text-brand-700' : 'text-ink/60 hover:bg-brand-50'}`
+        }
+      >
+        <Icon name="info" className="h-5 w-5" /> About
+      </NavLink>
       <button
         onClick={handleSignOut}
         className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink/60 hover:bg-coral/10 hover:text-coral"
