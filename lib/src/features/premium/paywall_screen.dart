@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../theme/app_theme.dart';
 import '../family/application/family_providers.dart';
@@ -61,18 +62,10 @@ class PaywallScreen extends StatelessWidget {
                 const _Benefit('✨', 'Advanced views & exports'),
                 const SizedBox(height: AppSpacing.xl),
                 FilledButton(
-                  onPressed: null, // wired to a payment provider later
+                  onPressed: () => context.push('/plans-billing'),
                   style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(52)),
-                  child: const Text('Upgrade (coming soon)'),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'Billing isn\'t set up yet. For now an admin can enable Premium '
-                  'from the admin console.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  child: const Text('See plans'),
                 ),
               ],
             ),
