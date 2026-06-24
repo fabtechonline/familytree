@@ -21,6 +21,7 @@ import TimeMachinePage from './pages/app/TimeMachinePage'
 import CapsulesPage from './pages/app/CapsulesPage'
 import AccountPage from './pages/app/AccountPage'
 import AboutPage from './pages/app/AboutPage'
+import PlansBillingPage from './pages/app/PlansBillingPage'
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage'
 import TermsPage from './pages/legal/TermsPage'
 import InvitePage from './pages/app/InvitePage'
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="join" element={<JoinFamilyPage />} />
         <Route path="suggestions" element={<SuggestionsPage />} />
         <Route path="account" element={<AccountPage />} />
+        <Route path="plans" element={<PlansBillingPage />} />
         <Route path="about" element={<AboutPage />} />
       </Route>
 
