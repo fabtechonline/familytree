@@ -35,6 +35,7 @@ class TreeLayout {
     required this.descents,
     required this.size,
     required this.nodeSize,
+    this.horizontal = false,
   });
 
   final List<TreeNode> nodes;
@@ -42,6 +43,9 @@ class TreeLayout {
   final List<DescentLink> descents;
   final Size size;
   final Size nodeSize;
+
+  /// When true the tree flows left→right (generations as columns).
+  final bool horizontal;
 
   bool get isEmpty => nodes.isEmpty;
 }
@@ -66,7 +70,7 @@ class TreeLayoutEngine {
   static const double vGap = 80;
   static const double margin = 48;
 
-  static TreeLayout build(FamilyGraph graph) {
+  static TreeLayout build(FamilyGraph graph, {bool horizontal = false}) {
     if (graph.members.isEmpty) {
       return const TreeLayout(
         nodes: [],
@@ -167,9 +171,12 @@ class TreeLayoutEngine {
       assign(u);
     }
 
-    // --- 5. Pixel positions. -------------------------------------------------
-    const colWidth = nodeWidth + hGap;
-    const rowHeight = nodeHeight + vGap;
+    // --- 5. Pixel positions (orientation-aware). ----------------------------
+    // "cross" = sibling axis (col), "depth" = generation axis (row).
+    final crossUnit = (horizontal ? nodeHeight : nodeWidth) + hGap;
+    final depthUnit = (horizontal ? nodeWidth : nodeHeight) + vGap;
+    final halfCross = (horizontal ? nodeHeight : nodeWidth) / 2;
+    final halfDepth = (horizontal ? nodeWidth : nodeHeight) / 2;
 
     double colOfMember(_Unit unit, String id) {
       if (!unit.isCouple) return unit.centerCol;
@@ -183,12 +190,13 @@ class TreeLayoutEngine {
       final unit = unitOf[m.id]!;
       final col = colOfMember(unit, m.id);
       final row = rowOf[m.id] ?? 0;
+      final crossPx = margin + col * crossUnit + halfCross;
+      final depthPx = margin + row * depthUnit + halfDepth;
       nodes.add(TreeNode(
         member: m,
-        center: Offset(
-          margin + col * colWidth + nodeWidth / 2,
-          margin + row * rowHeight + nodeHeight / 2,
-        ),
+        center: horizontal
+            ? Offset(depthPx, crossPx)
+            : Offset(crossPx, depthPx),
       ));
     }
 
@@ -232,6 +240,7 @@ class TreeLayoutEngine {
       descents: descents,
       size: Size(maxX + nodeWidth / 2 + margin, maxY + nodeHeight / 2 + margin),
       nodeSize: const Size(nodeWidth, nodeHeight),
+      horizontal: horizontal,
     );
   }
 }
