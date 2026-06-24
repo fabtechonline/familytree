@@ -198,7 +198,42 @@ class _ProfileBody extends StatelessWidget {
         _RelationGroup(title: 'Siblings', members: _siblings),
         _MemoriesSection(
             familyId: familyId, memberId: member.id, canEdit: canEdit),
+        const SizedBox(height: AppSpacing.lg),
+        _AuditFooter(memberId: member.id),
       ],
+    );
+  }
+}
+
+/// Shows who created / last updated this member (from the member_audit RPC).
+class _AuditFooter extends ConsumerWidget {
+  const _AuditFooter({required this.memberId});
+  final String memberId;
+
+  static String _fmt(dynamic ts) {
+    final d = DateTime.tryParse(ts as String? ?? '');
+    return d == null ? '' : '${d.day}/${d.month}/${d.year}';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final client = ref.watch(supabaseClientProvider);
+    return FutureBuilder<dynamic>(
+      future: client.rpc('member_audit', params: {'p_member': memberId}),
+      builder: (context, snap) {
+        final rows = snap.data as List?;
+        if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+        final a = rows.first as Map;
+        final updatedBy = a['updated_by_name'];
+        final showUpdated =
+            updatedBy != null && a['updated_at'] != a['created_at'];
+        return Text(
+          'Added by ${a['created_by_name']} · ${_fmt(a['created_at'])}'
+          '${showUpdated ? '\nLast updated by $updatedBy · ${_fmt(a['updated_at'])}' : ''}',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+        );
+      },
     );
   }
 }

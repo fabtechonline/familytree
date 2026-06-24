@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { useFamily } from '../../app/FamilyProvider'
 import { useMembers, useRelationships, useMemberMedia } from '../../data/queries'
@@ -110,7 +111,30 @@ export default function MemberProfilePage() {
       </div>
 
       <MemoriesSection memberId={member.id} familyId={current!.id} canAdd={canEditThis} uid={myUid} />
+      <AuditFooter memberId={member.id} />
     </div>
+  )
+}
+
+function AuditFooter({ memberId }: { memberId: string }) {
+  const { data } = useQuery({
+    queryKey: ['member-audit', memberId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('member_audit', { p_member: memberId })
+      if (error) throw error
+      return (Array.isArray(data) ? data[0] : data) as
+        | { created_by_name: string; created_at: string; updated_by_name: string | null; updated_at: string }
+        | null
+    },
+  })
+  if (!data) return null
+  return (
+    <p className="mt-4 text-center text-xs text-ink/40">
+      Added by {data.created_by_name} · {formatDate(data.created_at)}
+      {data.updated_by_name && data.updated_at !== data.created_at && (
+        <> · Last updated by {data.updated_by_name} · {formatDate(data.updated_at)}</>
+      )}
+    </p>
   )
 }
 
