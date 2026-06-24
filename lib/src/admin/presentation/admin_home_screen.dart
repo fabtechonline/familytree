@@ -17,6 +17,8 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
     (icon: Icons.dashboard_rounded, label: 'Overview'),
     (icon: Icons.people_alt_rounded, label: 'Accounts'),
     (icon: Icons.diversity_3_rounded, label: 'Families'),
+    (icon: Icons.sell_rounded, label: 'Plans'),
+    (icon: Icons.settings_rounded, label: 'Settings'),
     (icon: Icons.receipt_long_rounded, label: 'Audit log'),
   ];
 
@@ -63,6 +65,8 @@ class _AdminHomeScreenState extends ConsumerState<AdminHomeScreen> {
                 _OverviewSection(),
                 _AccountsSection(),
                 _FamiliesSection(),
+                _PlansSection(),
+                _SettingsSection(),
                 _AuditSection(),
               ],
             ),
@@ -517,6 +521,442 @@ class _FamilyManageSheetState extends ConsumerState<_FamilyManageSheet> {
         ],
       ),
     );
+  }
+}
+
+// ---- Plans ------------------------------------------------------------------
+
+class _PlansSection extends ConsumerWidget {
+  const _PlansSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plans = ref.watch(adminPlansProvider);
+    return _SectionScaffold(
+      title: 'Plans & pricing',
+      child: plans.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (list) => ListView.separated(
+          itemCount: list.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          itemBuilder: (_, i) => _PlanCard(plan: list[i]),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlanCard extends ConsumerStatefulWidget {
+  const _PlanCard({required this.plan});
+  final AdminPlan plan;
+
+  @override
+  ConsumerState<_PlanCard> createState() => _PlanCardState();
+}
+
+class _PlanCardState extends ConsumerState<_PlanCard> {
+  late final _label = TextEditingController(text: widget.plan.label);
+  late final _price =
+      TextEditingController(text: (widget.plan.priceCents / 100).toString());
+  late final _paystack =
+      TextEditingController(text: widget.plan.paystackPlanCode ?? '');
+  late final _sku =
+      TextEditingController(text: widget.plan.storeProductId ?? '');
+  late bool _active = widget.plan.isActive;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _label.dispose();
+    _price.dispose();
+    _paystack.dispose();
+    _sku.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final cents =
+          ((double.tryParse(_price.text.trim()) ?? widget.plan.priceCents / 100) *
+                  100)
+              .round();
+      await ref.read(adminRepositoryProvider).updatePlan(
+            widget.plan.key,
+            label: _label.text.trim(),
+            priceCents: cents,
+            interval: widget.plan.interval,
+            isActive: _active,
+            paystackPlanCode:
+                _paystack.text.trim().isEmpty ? null : _paystack.text.trim(),
+            storeProductId: _sku.text.trim().isEmpty ? null : _sku.text.trim(),
+          );
+      ref.invalidate(adminPlansProvider);
+      messenger.showSnackBar(const SnackBar(content: Text('Plan saved')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Failed: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                      '${widget.plan.key.replaceAll('_', ' ')}  ·  ${widget.plan.tier} · ${widget.plan.interval}',
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                Switch(
+                    value: _active,
+                    onChanged: _busy ? null : (v) => setState(() => _active = v)),
+                const Text('Active'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                SizedBox(
+                    width: 220,
+                    child: TextField(
+                        controller: _label,
+                        decoration: const InputDecoration(
+                            labelText: 'Label', border: OutlineInputBorder()))),
+                SizedBox(
+                    width: 140,
+                    child: TextField(
+                        controller: _price,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: 'Price (R)',
+                            border: OutlineInputBorder()))),
+                SizedBox(
+                    width: 220,
+                    child: TextField(
+                        controller: _paystack,
+                        decoration: const InputDecoration(
+                            labelText: 'Paystack plan code',
+                            border: OutlineInputBorder()))),
+                SizedBox(
+                    width: 220,
+                    child: TextField(
+                        controller: _sku,
+                        decoration: const InputDecoration(
+                            labelText: 'Store product ID',
+                            border: OutlineInputBorder()))),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                  onPressed: _busy ? null : _save, child: const Text('Save')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---- Settings ---------------------------------------------------------------
+
+class _SettingsSection extends ConsumerWidget {
+  const _SettingsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(adminSettingsProvider);
+    return _SectionScaffold(
+      title: 'App settings',
+      child: settings.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (list) {
+          final byKey = {for (final s in list) s.key: s.value};
+          Map<String, dynamic> m(String k) {
+            final v = byKey[k];
+            return (v is Map) ? Map<String, dynamic>.from(v) : <String, dynamic>{};
+          }
+
+          final lim = byKey['free_member_limit'];
+          return ListView(
+            children: [
+              _MaintenanceCard(initial: m('maintenance')),
+              const SizedBox(height: 12),
+              _FeaturesCard(initial: m('features')),
+              const SizedBox(height: 12),
+              _MapCard(
+                  title: 'Paystack',
+                  settingKey: 'paystack',
+                  initial: m('paystack'),
+                  fields: const [
+                    ('public_key', 'Public key'),
+                    ('mode', 'Mode (test / live)'),
+                  ],
+                  note: 'The secret key stays a server-side function secret.'),
+              const SizedBox(height: 12),
+              _MapCard(
+                  title: 'Support & announcements',
+                  settingKey: 'support',
+                  initial: m('support'),
+                  fields: const [
+                    ('email', 'Support email'),
+                    ('announcement', 'Announcement (blank = hidden)'),
+                  ]),
+              const SizedBox(height: 12),
+              _LimitCard(initial: (lim is num) ? lim.toInt() : 50),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SettingShell extends StatelessWidget {
+  const _SettingShell({required this.title, required this.children, this.note});
+  final String title;
+  final List<Widget> children;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            ...children,
+            if (note != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(note!,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SaveBtn extends StatelessWidget {
+  const _SaveBtn({required this.busy, required this.onSave});
+  final bool busy;
+  final VoidCallback onSave;
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: FilledButton(
+              onPressed: busy ? null : onSave, child: const Text('Save')),
+        ),
+      );
+}
+
+Future<void> _saveSetting(
+    WidgetRef ref, BuildContext context, String key, dynamic value) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    await ref.read(adminRepositoryProvider).setSetting(key, value);
+    ref.invalidate(adminSettingsProvider);
+    messenger.showSnackBar(const SnackBar(content: Text('Saved')));
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text('Failed: $e')));
+  }
+}
+
+class _MaintenanceCard extends ConsumerStatefulWidget {
+  const _MaintenanceCard({required this.initial});
+  final Map<String, dynamic> initial;
+  @override
+  ConsumerState<_MaintenanceCard> createState() => _MaintenanceCardState();
+}
+
+class _MaintenanceCardState extends ConsumerState<_MaintenanceCard> {
+  late bool _enabled = widget.initial['enabled'] == true;
+  late final _msg =
+      TextEditingController(text: widget.initial['message'] as String? ?? '');
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _msg.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingShell(title: 'Maintenance mode', children: [
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Enabled'),
+        value: _enabled,
+        onChanged: _busy ? null : (v) => setState(() => _enabled = v),
+      ),
+      TextField(
+          controller: _msg,
+          decoration: const InputDecoration(
+              labelText: 'Message', border: OutlineInputBorder())),
+      _SaveBtn(
+          busy: _busy,
+          onSave: () async {
+            setState(() => _busy = true);
+            await _saveSetting(ref, context, 'maintenance',
+                {'enabled': _enabled, 'message': _msg.text.trim()});
+            if (mounted) setState(() => _busy = false);
+          }),
+    ]);
+  }
+}
+
+class _FeaturesCard extends ConsumerStatefulWidget {
+  const _FeaturesCard({required this.initial});
+  final Map<String, dynamic> initial;
+  @override
+  ConsumerState<_FeaturesCard> createState() => _FeaturesCardState();
+}
+
+class _FeaturesCardState extends ConsumerState<_FeaturesCard> {
+  static const _keys = ['face_recognition', 'ai_avatar', 'data_export'];
+  late final Map<String, bool> _vals = {
+    for (final k in _keys) k: widget.initial[k] != false
+  };
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingShell(title: 'Premium feature flags', children: [
+      for (final k in _keys)
+        CheckboxListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(k.replaceAll('_', ' ')),
+          value: _vals[k],
+          onChanged:
+              _busy ? null : (v) => setState(() => _vals[k] = v ?? false),
+        ),
+      _SaveBtn(
+          busy: _busy,
+          onSave: () async {
+            setState(() => _busy = true);
+            await _saveSetting(ref, context, 'features', _vals);
+            if (mounted) setState(() => _busy = false);
+          }),
+    ]);
+  }
+}
+
+class _MapCard extends ConsumerStatefulWidget {
+  const _MapCard(
+      {required this.title,
+      required this.settingKey,
+      required this.initial,
+      required this.fields,
+      this.note});
+  final String title;
+  final String settingKey;
+  final Map<String, dynamic> initial;
+  final List<(String, String)> fields;
+  final String? note;
+  @override
+  ConsumerState<_MapCard> createState() => _MapCardState();
+}
+
+class _MapCardState extends ConsumerState<_MapCard> {
+  late final Map<String, TextEditingController> _ctl = {
+    for (final f in widget.fields)
+      f.$1: TextEditingController(text: widget.initial[f.$1]?.toString() ?? '')
+  };
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    for (final c in _ctl.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingShell(title: widget.title, note: widget.note, children: [
+      for (final f in widget.fields)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: TextField(
+              controller: _ctl[f.$1],
+              decoration: InputDecoration(
+                  labelText: f.$2, border: const OutlineInputBorder())),
+        ),
+      _SaveBtn(
+          busy: _busy,
+          onSave: () async {
+            setState(() => _busy = true);
+            final value = {
+              for (final e in _ctl.entries) e.key: e.value.text.trim()
+            };
+            await _saveSetting(ref, context, widget.settingKey, value);
+            if (mounted) setState(() => _busy = false);
+          }),
+    ]);
+  }
+}
+
+class _LimitCard extends ConsumerStatefulWidget {
+  const _LimitCard({required this.initial});
+  final int initial;
+  @override
+  ConsumerState<_LimitCard> createState() => _LimitCardState();
+}
+
+class _LimitCardState extends ConsumerState<_LimitCard> {
+  late final _ctl = TextEditingController(text: widget.initial.toString());
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingShell(title: 'Default free-tier member limit', children: [
+      SizedBox(
+        width: 160,
+        child: TextField(
+            controller: _ctl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(border: OutlineInputBorder())),
+      ),
+      _SaveBtn(
+          busy: _busy,
+          onSave: () async {
+            setState(() => _busy = true);
+            await _saveSetting(ref, context, 'free_member_limit',
+                int.tryParse(_ctl.text.trim()) ?? 50);
+            if (mounted) setState(() => _busy = false);
+          }),
+    ]);
   }
 }
 
