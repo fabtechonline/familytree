@@ -80,7 +80,7 @@ async function verifyApple(productId: string, token: string) {
     const info = b64urlJson(signed.split('.')[1])
     const expires = info.expiresDate ? new Date(info.expiresDate as number).toISOString() : null
     const active = !info.revocationDate && (productId === 'lifetime' || (info.expiresDate as number) > Date.now())
-    return { active, periodEnd: productId === 'lifetime' ? null : expires }
+    return { active, periodEnd: productId === 'lifetime' ? null : expires, originalTransactionId: info.originalTransactionId as string }
   }
   throw new Error('Apple transaction not found')
 }
@@ -106,15 +106,17 @@ Deno.serve(async (req) => {
     if (isApple && (!APPLE_KEY || !APPLE_KEY_ID || !APPLE_ISSUER)) return json({ error: 'Apple IAP is not configured yet.' }, 503)
     if (!isApple && !GOOGLE_SA) return json({ error: 'Google Play is not configured yet.' }, 503)
 
-    const { active, periodEnd } = isApple ? await verifyApple(productId, token) : await verifyGoogle(productId, token)
-    if (!active) return json({ ok: false, error: 'Purchase is not active' }, 200)
+    const result = isApple ? await verifyApple(productId, token) : await verifyGoogle(productId, token)
+    if (!result.active) return json({ ok: false, error: 'Purchase is not active' }, 200)
 
     await svc.from('family_billing').upsert({
       family_id: familyId, plan_key: productId,
       billing_provider: isApple ? 'apple' : 'google_play', status: 'active',
       is_comp: false, cancel_at_period_end: false,
-      current_period_end: periodEnd, updated_at: new Date().toISOString(),
-      ...(isApple ? { apple_original_transaction_id: token.slice(0, 64) } : { google_purchase_token: token, google_product_id: productId }),
+      current_period_end: result.periodEnd, updated_at: new Date().toISOString(),
+      ...(isApple
+        ? { apple_original_transaction_id: (result as { originalTransactionId?: string }).originalTransactionId }
+        : { google_purchase_token: token, google_product_id: productId }),
     })
     await svc.rpc('recompute_family_tier', { p_family: familyId })
     await svc.from('subscription_events').insert({
