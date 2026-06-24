@@ -20,6 +20,7 @@ import InsightsPage from './pages/app/InsightsPage'
 import TimeMachinePage from './pages/app/TimeMachinePage'
 import CapsulesPage from './pages/app/CapsulesPage'
 import AccountPage from './pages/app/AccountPage'
+import AboutPage from './pages/app/AboutPage'
 import InvitePage from './pages/app/InvitePage'
 import JoinFamilyPage from './pages/app/JoinFamilyPage'
 import SuggestionsPage from './pages/app/SuggestionsPage'
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="join" element={<JoinFamilyPage />} />
         <Route path="suggestions" element={<SuggestionsPage />} />
         <Route path="account" element={<AccountPage />} />
+        <Route path="about" element={<AboutPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
