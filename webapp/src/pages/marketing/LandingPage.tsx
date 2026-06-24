@@ -274,6 +274,8 @@ function Footer() {
         <div className="flex items-center gap-6 text-sm text-ink/60">
           <a href="#features" className="hover:text-brand-700">Features</a>
           <a href="#pricing" className="hover:text-brand-700">Pricing</a>
+          <Link to="/privacy" className="hover:text-brand-700">Privacy</Link>
+          <Link to="/terms" className="hover:text-brand-700">Terms</Link>
           <Link to="/app/sign-in" className="hover:text-brand-700">Log in</Link>
           <Link to="/app/register" className="hover:text-brand-700">Sign up</Link>
         </div>

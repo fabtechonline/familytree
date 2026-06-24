@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import Icon from '../../components/Icon'
 
 const APP_VERSION = '1.0.0'
@@ -36,6 +37,18 @@ export default function AboutPage() {
             <div className="truncate text-xs text-ink/50">{DEV_EMAIL}</div>
           </div>
         </a>
+      </div>
+
+      <h2 className="mt-8 text-sm font-semibold text-ink/70">Legal</h2>
+      <div className="card mt-2 divide-y divide-ink/10">
+        <Link to="/privacy" className="flex items-center gap-3 p-4 hover:bg-brand-50">
+          <Icon name="shield" className="h-5 w-5 text-ink/50" />
+          <span className="text-sm font-medium text-ink">Privacy Policy</span>
+        </Link>
+        <Link to="/terms" className="flex items-center gap-3 p-4 hover:bg-brand-50">
+          <Icon name="info" className="h-5 w-5 text-ink/50" />
+          <span className="text-sm font-medium text-ink">Terms of Service</span>
+        </Link>
       </div>
 
       <p className="mt-6 text-center text-xs text-ink/40">

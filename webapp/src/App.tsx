@@ -21,6 +21,8 @@ import TimeMachinePage from './pages/app/TimeMachinePage'
 import CapsulesPage from './pages/app/CapsulesPage'
 import AccountPage from './pages/app/AccountPage'
 import AboutPage from './pages/app/AboutPage'
+import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage'
+import TermsPage from './pages/legal/TermsPage'
 import InvitePage from './pages/app/InvitePage'
 import JoinFamilyPage from './pages/app/JoinFamilyPage'
 import SuggestionsPage from './pages/app/SuggestionsPage'
@@ -40,6 +42,10 @@ export default function App() {
     <Routes>
       {/* Marketing */}
       <Route path="/" element={<LandingPage />} />
+
+      {/* Legal (public) */}
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
 
       {/* Auth (public) */}
       <Route path="/app/sign-in" element={<SignInPage />} />

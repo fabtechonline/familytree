@@ -26,6 +26,16 @@ class _AboutScreenState extends State<AboutScreen> {
     });
   }
 
+  Future<void> _openUrl(String url) async {
+    final ok = await launchUrl(Uri.parse(url),
+        mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open $url')),
+      );
+    }
+  }
+
   Future<void> _emailDeveloper() async {
     final uri = Uri(
       scheme: 'mailto',
@@ -95,6 +105,27 @@ class _AboutScreenState extends State<AboutScreen> {
               subtitle: const Text(_email),
               trailing: const Icon(Icons.open_in_new_rounded, size: 18),
               onTap: _emailDeveloper,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          const _SectionLabel('Legal'),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip_rounded),
+                  title: const Text('Privacy Policy'),
+                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                  onTap: () => _openUrl('https://www.riza.co.za/privacy'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.description_rounded),
+                  title: const Text('Terms of Service'),
+                  trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                  onTap: () => _openUrl('https://www.riza.co.za/terms'),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
