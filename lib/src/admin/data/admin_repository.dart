@@ -185,6 +185,11 @@ final adminRepositoryProvider = Provider<AdminRepository>((ref) {
   return AdminRepository(ref.watch(supabaseClientProvider));
 });
 
+/// Whether the signed-in user is a platform super-admin (profiles.is_super_admin).
+final isSuperAdminProvider = FutureProvider<bool>((ref) async {
+  return ref.watch(adminRepositoryProvider).isSuperAdmin();
+});
+
 final adminStatsProvider =
     FutureProvider<PlatformStats>((ref) => ref.watch(adminRepositoryProvider).stats());
 

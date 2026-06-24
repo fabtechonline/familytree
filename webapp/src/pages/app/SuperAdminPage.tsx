@@ -36,6 +36,7 @@ export default function SuperAdminPage() {
             <span className="ml-2 rounded-pill bg-ink text-white text-xs px-2 py-0.5">admin</span>
           </Link>
           <div className="flex items-center gap-3">
+            <Link to="/app/create-family" className="btn-ghost h-10">Create a family</Link>
             <Link to="/app" className="btn-ghost h-10">My families</Link>
             <button onClick={signOut} className="btn-ghost h-10"><Icon name="logout" className="h-4 w-4" /> Sign out</button>
           </div>

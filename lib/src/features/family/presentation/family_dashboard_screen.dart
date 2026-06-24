@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../admin/data/admin_repository.dart';
 import '../../../theme/app_theme.dart';
 import '../../auth/application/otp_controller.dart';
 import '../../auth/data/auth_repository.dart';
@@ -102,6 +103,7 @@ class FamilyDashboardScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final theme = Theme.of(context);
+    final isSuper = ref.watch(isSuperAdminProvider).value ?? false;
     // Keep a live Realtime subscription open while the dashboard is visible so
     // changes from other relatives appear without a manual refresh.
     ref.watch(familyRealtimeProvider(family.id));
@@ -137,6 +139,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
                   _setPasswordDialog(context, ref);
                 case 'about':
                   context.push('/about');
+                case 'admin':
+                  context.push('/admin');
               }
             },
             itemBuilder: (context) => [
@@ -154,6 +158,9 @@ class FamilyDashboardScreen extends ConsumerWidget {
               const PopupMenuItem(
                   value: 'set-password', child: Text('Set / change password')),
               const PopupMenuItem(value: 'about', child: Text('About')),
+              if (isSuper)
+                const PopupMenuItem(
+                    value: 'admin', child: Text('Platform admin')),
               const PopupMenuItem(value: 'signout', child: Text('Sign out')),
             ],
           ),

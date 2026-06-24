@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../admin/data/admin_repository.dart';
+import '../../../admin/presentation/admin_home_screen.dart';
 import '../../auth/application/account_status_provider.dart';
 import '../../auth/data/auth_repository.dart';
 import '../application/family_providers.dart';
@@ -47,9 +49,19 @@ class HomeGate extends ConsumerWidget {
           ),
         ),
       ),
-      data: (families) => families.isEmpty
-          ? const CreateFamilyScreen(isFirstFamily: true)
-          : const FamilyDashboardScreen(),
+      data: (families) {
+        if (families.isNotEmpty) return const FamilyDashboardScreen();
+        // No families yet: super-admins go straight to the platform console;
+        // everyone else is onboarded to create their first family.
+        return ref.watch(isSuperAdminProvider).when(
+              loading: () => const Scaffold(
+                  body: Center(child: CircularProgressIndicator())),
+              error: (_, _) => const CreateFamilyScreen(isFirstFamily: true),
+              data: (isSuper) => isSuper
+                  ? const AdminHomeScreen()
+                  : const CreateFamilyScreen(isFirstFamily: true),
+            );
+      },
     );
   }
 }
