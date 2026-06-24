@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,8 +16,8 @@ import '../domain/family_graph.dart';
 import '../domain/lineage.dart';
 import '../domain/tree_layout.dart';
 
-/// Tree view modes available on mobile (Wide/Fan are web-only for now).
-enum TreeViewMode { tree, focus }
+/// Tree view modes.
+enum TreeViewMode { tree, wide, focus, fan }
 
 /// The visual family tree: a pan/zoom canvas of member cards connected by
 /// parent→child and spouse links. Tapping a node opens an action menu, and
@@ -207,7 +209,7 @@ class _FamilyTreeScreenState extends ConsumerState<FamilyTreeScreen> {
           final rels =
               ref.watch(relationshipsProvider(family.id)).value ?? const [];
           // Default the focus to "me" (or first member) when entering Focus.
-          if (_mode == TreeViewMode.focus &&
+          if ((_mode == TreeViewMode.focus || _mode == TreeViewMode.fan) &&
               _focusId == null &&
               fullGraph.members.isNotEmpty) {
             final mine = fullGraph.members.firstWhere(
@@ -222,7 +224,8 @@ class _FamilyTreeScreenState extends ConsumerState<FamilyTreeScreen> {
 
           final visible = _visibleMembers(fullGraph);
           final graph = FamilyGraph.build(visible, rels);
-          final layout = TreeLayoutEngine.build(graph);
+          final layout = TreeLayoutEngine.build(graph,
+              horizontal: _mode == TreeViewMode.wide);
           final lineage = _lineageOf == null
               ? null
               : computeLineage(graph, _lineageOf!, full: _full);
@@ -230,7 +233,15 @@ class _FamilyTreeScreenState extends ConsumerState<FamilyTreeScreen> {
 
           return Stack(
             children: [
-              if (layout.isEmpty)
+              if (_mode == TreeViewMode.fan && _focusId != null)
+                Positioned.fill(
+                  child: _FanView(
+                    graph: fullGraph,
+                    focusId: _focusId!,
+                    onTap: (m) => _showNodeMenu(family, m, myUid, fullGraph),
+                  ),
+                )
+              else if (layout.isEmpty)
                 const _EmptyTree()
               else
                 InteractiveViewer(
@@ -312,7 +323,9 @@ class _FamilyTreeScreenState extends ConsumerState<FamilyTreeScreen> {
                     onClear: () => setState(() => _lineageOf = null),
                   ),
                 )
-              else if (_mode == TreeViewMode.focus && _focusId != null)
+              else if ((_mode == TreeViewMode.focus ||
+                      _mode == TreeViewMode.fan) &&
+                  _focusId != null)
                 Positioned(
                   left: 0,
                   right: 0,
@@ -379,41 +392,65 @@ class _EdgePainter extends CustomPainter {
       groups.putIfAbsent('${d.parentA}|${d.parentB}', () => []).add(d);
     }
 
+    final horizontal = layout.horizontal;
     for (final group in groups.values) {
       final first = group.first;
       final a = centers[first.parentA];
       if (a == null) continue;
       final b = first.parentB == null ? null : centers[first.parentB!];
-      final anchorX = b == null ? a.dx : (a.dx + b.dx) / 2;
-      final anchorY = a.dy + halfH;
-
       final groupHi = group.any(_descentHighlighted);
       final trunkPaint = groupHi ? highlightPaint : parentPaint;
 
-      final childTops = <Offset>[];
-      final hiTops = <Offset>[];
-      for (final d in group) {
-        final c = centers[d.child];
-        if (c == null) continue;
-        final top = Offset(c.dx, c.dy - halfH);
-        childTops.add(top);
-        if (groupHi && _descentHighlighted(d)) hiTops.add(top);
-      }
-      if (childTops.isEmpty) continue;
-
-      final busY = anchorY + (childTops.first.dy - anchorY) / 2;
-      canvas.drawLine(Offset(anchorX, anchorY), Offset(anchorX, busY), trunkPaint);
-
-      final xs = [anchorX, ...childTops.map((o) => o.dx)];
-      final barLeft = xs.reduce((v, e) => e < v ? e : v);
-      final barRight = xs.reduce((v, e) => e > v ? e : v);
-      if (barRight - barLeft > 0.5) {
-        canvas.drawLine(Offset(barLeft, busY), Offset(barRight, busY), trunkPaint);
-      }
-      for (final top in childTops) {
-        final dropHi = groupHi && hiTops.contains(top);
-        canvas.drawLine(
-            Offset(top.dx, busY), top, dropHi ? highlightPaint : parentPaint);
+      if (horizontal) {
+        final anchorY = b == null ? a.dy : (a.dy + b.dy) / 2;
+        final anchorX = a.dx + halfW;
+        final pts = <Offset>[];
+        final hiPts = <Offset>[];
+        for (final d in group) {
+          final c = centers[d.child];
+          if (c == null) continue;
+          final p = Offset(c.dx - halfW, c.dy);
+          pts.add(p);
+          if (groupHi && _descentHighlighted(d)) hiPts.add(p);
+        }
+        if (pts.isEmpty) continue;
+        final busX = anchorX + (pts.first.dx - anchorX) / 2;
+        canvas.drawLine(Offset(anchorX, anchorY), Offset(busX, anchorY), trunkPaint);
+        final ys = [anchorY, ...pts.map((o) => o.dy)];
+        final top = ys.reduce((v, e) => e < v ? e : v);
+        final bot = ys.reduce((v, e) => e > v ? e : v);
+        if (bot - top > 0.5) {
+          canvas.drawLine(Offset(busX, top), Offset(busX, bot), trunkPaint);
+        }
+        for (final p in pts) {
+          final dropHi = groupHi && hiPts.contains(p);
+          canvas.drawLine(Offset(busX, p.dy), p, dropHi ? highlightPaint : parentPaint);
+        }
+      } else {
+        final anchorX = b == null ? a.dx : (a.dx + b.dx) / 2;
+        final anchorY = a.dy + halfH;
+        final childTops = <Offset>[];
+        final hiTops = <Offset>[];
+        for (final d in group) {
+          final c = centers[d.child];
+          if (c == null) continue;
+          final t = Offset(c.dx, c.dy - halfH);
+          childTops.add(t);
+          if (groupHi && _descentHighlighted(d)) hiTops.add(t);
+        }
+        if (childTops.isEmpty) continue;
+        final busY = anchorY + (childTops.first.dy - anchorY) / 2;
+        canvas.drawLine(Offset(anchorX, anchorY), Offset(anchorX, busY), trunkPaint);
+        final xs = [anchorX, ...childTops.map((o) => o.dx)];
+        final barLeft = xs.reduce((v, e) => e < v ? e : v);
+        final barRight = xs.reduce((v, e) => e > v ? e : v);
+        if (barRight - barLeft > 0.5) {
+          canvas.drawLine(Offset(barLeft, busY), Offset(barRight, busY), trunkPaint);
+        }
+        for (final t in childTops) {
+          final dropHi = groupHi && hiTops.contains(t);
+          canvas.drawLine(Offset(t.dx, busY), t, dropHi ? highlightPaint : parentPaint);
+        }
       }
     }
 
@@ -425,11 +462,20 @@ class _EdgePainter extends CustomPainter {
       final hi = lineage != null &&
           (lineage!.unionMembers.contains(u.a) ||
               lineage!.unionMembers.contains(u.b));
-      final left = a.dx <= b.dx ? a : b;
-      final right = a.dx <= b.dx ? b : a;
-      final sameRow = (left.dy - right.dy).abs() < 1;
-      final start = sameRow ? Offset(left.dx + halfW, left.dy) : left;
-      final end = sameRow ? Offset(right.dx - halfW, right.dy) : right;
+      Offset start, end;
+      if (horizontal) {
+        final upper = a.dy <= b.dy ? a : b;
+        final lower = a.dy <= b.dy ? b : a;
+        final aligned = (upper.dx - lower.dx).abs() < 1;
+        start = aligned ? Offset(upper.dx, upper.dy + halfH) : upper;
+        end = aligned ? Offset(lower.dx, lower.dy - halfH) : lower;
+      } else {
+        final left = a.dx <= b.dx ? a : b;
+        final right = a.dx <= b.dx ? b : a;
+        final sameRow = (left.dy - right.dy).abs() < 1;
+        start = sameRow ? Offset(left.dx + halfW, left.dy) : left;
+        end = sameRow ? Offset(right.dx - halfW, right.dy) : right;
+      }
       canvas.drawLine(start, end, hi ? highlightPaint : unionPaint);
       _drawHeart(canvas,
           Offset((start.dx + end.dx) / 2, (start.dy + end.dy) / 2), active && !hi);
@@ -617,18 +663,19 @@ class _ViewSwitcher extends StatelessWidget {
       return GestureDetector(
         onTap: () => onChanged(m),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
           decoration: BoxDecoration(
             color: sel ? theme.colorScheme.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(AppRadii.pill),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(icon,
-                size: 16,
+                size: 15,
                 color: sel ? Colors.white : theme.colorScheme.onSurfaceVariant),
-            const SizedBox(width: 6),
+            const SizedBox(width: 5),
             Text(label,
                 style: TextStyle(
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color:
                         sel ? Colors.white : theme.colorScheme.onSurfaceVariant)),
@@ -645,7 +692,9 @@ class _ViewSwitcher extends StatelessWidget {
         padding: const EdgeInsets.all(4),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           seg(TreeViewMode.tree, 'Tree', Icons.account_tree_rounded),
+          seg(TreeViewMode.wide, 'Wide', Icons.swap_horiz_rounded),
           seg(TreeViewMode.focus, 'Focus', Icons.center_focus_strong_rounded),
+          seg(TreeViewMode.fan, 'Fan', Icons.donut_large_rounded),
         ]),
       ),
     );
@@ -711,6 +760,204 @@ class _CollapseChip extends StatelessWidget {
       ),
     );
   }
+}
+
+// ---- Fan chart (radial ancestors) ------------------------------------------
+
+const double _fanR0 = 54;
+const double _fanRing = 64;
+const int _fanMaxGen = 4;
+const double _fanPad = 24;
+
+class _FanView extends StatelessWidget {
+  const _FanView(
+      {required this.graph, required this.focusId, required this.onTap});
+  final FamilyGraph graph;
+  final String focusId;
+  final void Function(Member) onTap;
+
+  List<Member?> _orderedParents(String id) {
+    final ps = (graph.parentsOf[id] ?? const <String>[])
+        .map((p) => graph.byId[p])
+        .whereType<Member>()
+        .toList();
+    Member? father, mother;
+    for (final p in ps) {
+      if (p.gender == 'male') father ??= p;
+      if (p.gender == 'female') mother ??= p;
+    }
+    if (father != null || mother != null) return [father, mother];
+    return [ps.isNotEmpty ? ps[0] : null, ps.length > 1 ? ps[1] : null];
+  }
+
+  Member? _ancestorAt(int g, int k) {
+    Member? cur = graph.byId[focusId];
+    for (var i = 0; i < g; i++) {
+      if (cur == null) return null;
+      final bit = (k >> (g - 1 - i)) & 1;
+      cur = _orderedParents(cur.id)[bit];
+    }
+    return cur;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final grid = <String, Member>{};
+    for (var g = 1; g <= _fanMaxGen; g++) {
+      final slots = 1 << g;
+      for (var k = 0; k < slots; k++) {
+        final m = _ancestorAt(g, k);
+        if (m != null) grid['$g:$k'] = m;
+      }
+    }
+    final focus = graph.byId[focusId];
+    final rMax = _fanR0 + _fanMaxGen * _fanRing;
+    final w = 2 * (rMax + _fanPad);
+    final h = rMax + _fanR0 + 2 * _fanPad;
+    final cx = rMax + _fanPad;
+    final cy = rMax + _fanPad;
+    final theme = Theme.of(context);
+
+    void handleTap(Offset pos) {
+      final dx = pos.dx - cx, dy = pos.dy - cy;
+      final r = math.sqrt(dx * dx + dy * dy);
+      if (r <= _fanR0) {
+        if (focus != null) onTap(focus);
+        return;
+      }
+      var ang = math.atan2(dy, dx);
+      if (ang < 0) ang += 2 * math.pi;
+      if (ang < math.pi) return; // lower half unused
+      final g = ((r - _fanR0) / _fanRing).ceil().clamp(1, _fanMaxGen);
+      final slots = 1 << g;
+      final k = ((ang - math.pi) / math.pi * slots).floor().clamp(0, slots - 1);
+      final m = grid['$g:$k'];
+      if (m != null) onTap(m);
+    }
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: FittedBox(
+          child: SizedBox(
+            width: w,
+            height: h,
+            child: GestureDetector(
+              onTapUp: (d) => handleTap(d.localPosition),
+              child: CustomPaint(
+                size: Size(w, h),
+                painter: _FanPainter(
+                  grid: grid,
+                  focusName: focus?.firstName ?? '',
+                  cx: cx,
+                  cy: cy,
+                  primary: theme.colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FanPainter extends CustomPainter {
+  _FanPainter({
+    required this.grid,
+    required this.focusName,
+    required this.cx,
+    required this.cy,
+    required this.primary,
+  });
+  final Map<String, Member> grid;
+  final String focusName;
+  final double cx, cy;
+  final Color primary;
+
+  Path _sector(double rIn, double rOut, double a0, double a1) {
+    final c = Offset(cx, cy);
+    return Path()
+      ..moveTo(cx + rOut * math.cos(a0), cy + rOut * math.sin(a0))
+      ..arcTo(Rect.fromCircle(center: c, radius: rOut), a0, a1 - a0, false)
+      ..lineTo(cx + rIn * math.cos(a1), cy + rIn * math.sin(a1))
+      ..arcTo(Rect.fromCircle(center: c, radius: rIn), a1, a0 - a1, false)
+      ..close();
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    for (var g = 1; g <= _fanMaxGen; g++) {
+      final slots = 1 << g;
+      final rIn = _fanR0 + (g - 1) * _fanRing;
+      final rOut = _fanR0 + g * _fanRing;
+      for (var k = 0; k < slots; k++) {
+        final a0 = math.pi + (k / slots) * math.pi;
+        final a1 = math.pi + ((k + 1) / slots) * math.pi;
+        final m = grid['$g:$k'];
+        final path = _sector(rIn, rOut, a0, a1);
+        canvas.drawPath(
+            path,
+            Paint()
+              ..style = PaintingStyle.fill
+              ..color = m != null
+                  ? (k.isEven
+                      ? const Color(0xFFE8F7F4)
+                      : const Color(0xFFF3FBF9))
+                  : const Color(0xFFF5F5F5));
+        canvas.drawPath(path, stroke);
+        if (m != null) {
+          final mid = (a0 + a1) / 2;
+          final rMid = (rIn + rOut) / 2;
+          final tx = cx + rMid * math.cos(mid);
+          final ty = cy + rMid * math.sin(mid);
+          var rot = mid + math.pi / 2;
+          var n = rot % (2 * math.pi);
+          if (n < 0) n += 2 * math.pi;
+          if (n > math.pi / 2 && n < 3 * math.pi / 2) rot += math.pi;
+          final tp = TextPainter(
+            text: TextSpan(
+              text: m.firstName +
+                  ((m.lastName ?? '').isNotEmpty ? ' ${m.lastName![0]}.' : ''),
+              style: TextStyle(
+                  fontSize: g >= 3 ? 9 : 11,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF0F3D3A)),
+            ),
+            maxLines: 1,
+            ellipsis: '…',
+            textDirection: TextDirection.ltr,
+          )..layout(maxWidth: _fanRing - 10);
+          canvas.save();
+          canvas.translate(tx, ty);
+          canvas.rotate(rot);
+          tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+          canvas.restore();
+        }
+      }
+    }
+    // Centre focus disc.
+    canvas.drawCircle(Offset(cx, cy), _fanR0, Paint()..color = primary);
+    final tp = TextPainter(
+      text: TextSpan(
+          text: focusName,
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+      maxLines: 2,
+      ellipsis: '…',
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: _fanR0 * 1.7);
+    tp.paint(canvas, Offset(cx - tp.width / 2, cy - tp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(covariant _FanPainter old) =>
+      old.focusName != focusName || old.grid.length != grid.length;
 }
 
 class _EmptyTree extends StatelessWidget {
