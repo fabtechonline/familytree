@@ -27,6 +27,7 @@ import '../features/suggestions/presentation/suggestions_screen.dart';
 import '../features/tree/presentation/family_tree_screen.dart';
 import '../features/map/presentation/family_map_screen.dart';
 import '../features/about/presentation/about_screen.dart';
+import '../admin/presentation/admin_home_screen.dart';
 
 /// App router. Redirects unauthenticated users to sign-in and authenticated
 /// users away from auth screens, reacting live to Supabase auth changes.
@@ -146,6 +147,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/about',
         builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => const AdminHomeScreen(),
       ),
     ],
   );

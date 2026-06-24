@@ -94,9 +94,12 @@ export default function AppShell() {
 
   useRealtime(current?.id)
 
-  // Onboarding gate: a signed-in user with no family creates one first.
+  // Onboarding gate: a signed-in user with no family creates one first — except
+  // a super-admin, who still needs the console, so send them there instead of
+  // trapping them on the create-family screen.
   if (loading) return <Spinner />
-  if (families.length === 0) return <Navigate to="/app/create-family" replace />
+  if (families.length === 0)
+    return <Navigate to={isSuper ? '/app/admin' : '/app/create-family'} replace />
 
   const items = NAV.filter((n) => (!n.adminOnly || admin) && (!n.superOnly || isSuper))
 
