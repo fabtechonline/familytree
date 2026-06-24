@@ -10,12 +10,13 @@ import { canEdit as roleCanEdit } from '../../lib/types'
 import { Spinner, EmptyState } from '../../components/ui'
 import Avatar from '../../components/Avatar'
 import Icon from '../../components/Icon'
+import FanChart from '../../components/FanChart'
 import type { Member, Relationship } from '../../lib/types'
 
 const HEART =
   'M12 21s-7-4.4-9.5-8.4C1 9.9 2.4 6.5 5.8 6.5c2 0 3.4 1.2 4.2 2.4.8-1.2 2.2-2.4 4.2-2.4 3.4 0 4.8 3.4 3.3 6.1C19 16.6 12 21 12 21z'
 
-type ViewMode = 'tree' | 'wide' | 'hourglass'
+type ViewMode = 'tree' | 'wide' | 'hourglass' | 'fan'
 interface MenuState { member: Member; x: number; y: number }
 
 /** parent→children and child→parents adjacency from the relationship edges. */
@@ -80,7 +81,7 @@ export default function TreePage() {
 
   // default the hourglass focus to "me" (or the first member)
   useEffect(() => {
-    if (mode === 'hourglass' && !focusId && members.length) {
+    if ((mode === 'hourglass' || mode === 'fan') && !focusId && members.length) {
       const mine = members.find((m) => m.linked_user_id === myUid)
       setFocusId(mine?.id ?? members[0].id)
     }
@@ -185,6 +186,7 @@ export default function TreePage() {
         <SwitchBtn m="tree" label="Tree" icon="tree" />
         <SwitchBtn m="wide" label="Wide" icon="arrow" />
         <SwitchBtn m="hourglass" label="Focus" icon="user" />
+        <SwitchBtn m="fan" label="Fan" icon="chart" />
       </div>
 
       <div className="absolute z-10 top-4 right-4 flex flex-col gap-2">
@@ -259,9 +261,15 @@ export default function TreePage() {
         </div>
       </div>
 
-      {mode === 'hourglass' && focusId && (
+      {mode === 'fan' && focusId && (
+        <div className="absolute inset-0 z-[5] bg-white">
+          <FanChart members={members} rels={rels} focusId={focusId} onSelect={openMenu} />
+        </div>
+      )}
+
+      {(mode === 'hourglass' || mode === 'fan') && focusId && (
         <div className="absolute z-10 bottom-4 left-1/2 -translate-x-1/2 rounded-pill bg-white border border-black/10 shadow-soft px-4 py-2 text-sm">
-          Focused on <span className="font-bold">{members.find((m) => m.id === focusId)?.first_name}</span> — tap any person → “Focus here”.
+          {mode === 'fan' ? 'Ancestors of' : 'Focused on'} <span className="font-bold">{members.find((m) => m.id === focusId)?.first_name}</span> — tap any person → “Focus here”.
         </div>
       )}
       {lineage && (
