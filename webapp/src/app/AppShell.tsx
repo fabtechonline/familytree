@@ -6,6 +6,7 @@ import { useFamily } from './FamilyProvider'
 import { isAdmin } from '../lib/types'
 import { Spinner } from '../components/ui'
 import { useMyProfile } from '../data/admin-queries'
+import { usePublicSettings } from '../data/settings'
 import { useRealtime } from './useRealtime'
 
 interface NavItem {
@@ -91,6 +92,7 @@ export default function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const admin = isAdmin(current?.myRole)
   const isSuper = !!profile?.is_super_admin
+  const { data: settings } = usePublicSettings()
 
   useRealtime(current?.id)
 
@@ -114,6 +116,19 @@ export default function AppShell() {
             Access to <b>{current.name}</b> has been suspended by the Riza team. Please contact
             {' '}<a className="text-brand-700" href="mailto:fabtechonline@gmail.com">support</a> if you believe this is a mistake.
           </p>
+          <button onClick={signOut} className="btn-ghost mt-5">Sign out</button>
+        </div>
+      </div>
+    )
+  }
+
+  // Maintenance mode blocks the app for everyone except super-admins.
+  if (settings?.maintenance.enabled && !isSuper) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-canvas px-6 text-center">
+        <div className="card max-w-md p-8">
+          <h1 className="text-lg font-bold text-ink">We’ll be right back</h1>
+          <p className="mt-2 text-sm text-ink/60">{settings.maintenance.message || 'Riza is undergoing maintenance. Please check back shortly.'}</p>
           <button onClick={signOut} className="btn-ghost mt-5">Sign out</button>
         </div>
       </div>
@@ -204,6 +219,9 @@ export default function AppShell() {
       )}
 
       <main className="lg:pl-64">
+        {settings?.announcement ? (
+          <div className="border-b border-sun/30 bg-sun/15 px-4 py-2 text-center text-sm text-ink">{settings.announcement}</div>
+        ) : null}
         <div className="container-x py-8">
           <Outlet />
         </div>

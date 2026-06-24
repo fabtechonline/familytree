@@ -10,6 +10,7 @@ import '../../family/domain/family.dart';
 import '../../members/application/member_providers.dart';
 import '../../members/data/member_repository.dart';
 import '../../members/domain/member.dart';
+import '../../settings/app_settings_provider.dart';
 import '../data/generate_avatar.dart';
 import '../dicebear.dart';
 
@@ -88,6 +89,8 @@ class _AvatarBuilderScreenState extends ConsumerState<AvatarBuilderScreen> {
   Widget build(BuildContext context) {
     final family = ref.watch(currentFamilyProvider);
     final isPremium = family?.subscriptionTier == SubscriptionTier.premium;
+    final aiOn = ref.watch(publicSettingsProvider).value?.aiAvatar != false;
+    final canAi = isPremium && aiOn;
     final hasPhoto = (widget.member.photoUrl ?? '').isNotEmpty;
 
     return Scaffold(
@@ -116,18 +119,22 @@ class _AvatarBuilderScreenState extends ConsumerState<AvatarBuilderScreen> {
               if (hasPhoto) ...[
                 const SizedBox(width: AppSpacing.sm),
                 FilledButton.icon(
-                  onPressed: (isPremium && !_aiBusy) ? _generateFromPhoto : null,
+                  onPressed: (canAi && !_aiBusy) ? _generateFromPhoto : null,
                   icon: const Icon(Icons.auto_awesome_rounded),
                   label: Text(_aiBusy ? 'Analyzing…' : 'From photo'),
                 ),
               ],
             ],
           ),
-          if (hasPhoto && !isPremium)
-            const Padding(
-              padding: EdgeInsets.only(top: 6),
-              child: Text('AI “generate from photo” is a Premium feature.',
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
+          if (hasPhoto && !canAi)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                  isPremium
+                      ? 'AI avatars are temporarily unavailable.'
+                      : 'AI “generate from photo” is a Premium feature.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
             ),
           const SizedBox(height: AppSpacing.lg),
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../admin/data/admin_repository.dart';
 import '../../../admin/presentation/admin_home_screen.dart';
+import '../../settings/app_settings_provider.dart';
 import '../../auth/application/account_status_provider.dart';
 import '../../auth/data/auth_repository.dart';
 import '../application/family_providers.dart';
@@ -20,6 +21,13 @@ class HomeGate extends ConsumerWidget {
     final status = ref.watch(accountStatusProvider).value;
     if (status == 'blocked' || status == 'suspended') {
       return _BlockedScreen(status: status!);
+    }
+
+    // Maintenance mode blocks the app for everyone except super-admins.
+    final settings = ref.watch(publicSettingsProvider).value;
+    final isSuper = ref.watch(isSuperAdminProvider).value ?? false;
+    if (settings != null && settings.maintenanceEnabled && !isSuper) {
+      return _MaintenanceScreen(message: settings.maintenanceMessage);
     }
 
     final families = ref.watch(myFamiliesProvider);
@@ -62,6 +70,40 @@ class HomeGate extends ConsumerWidget {
                   : const CreateFamilyScreen(isFirstFamily: true),
             );
       },
+    );
+  }
+}
+
+/// Shown when the platform is in maintenance mode.
+class _MaintenanceScreen extends StatelessWidget {
+  const _MaintenanceScreen({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.construction_rounded, size: 56),
+              const SizedBox(height: 16),
+              Text('We’ll be right back',
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Text(
+                  message.isEmpty
+                      ? 'Riza is undergoing maintenance. Please check back shortly.'
+                      : message,
+                  textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

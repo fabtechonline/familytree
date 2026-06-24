@@ -4,6 +4,7 @@ import { updateMember } from '../data/mutations'
 import { avatarUrl, AVATAR_STYLE, SKIN_TONES, HAIR_COLORS, HAIR_STYLES } from '../lib/avatar'
 import type { AvatarConfig, Member } from '../lib/types'
 import { generateAvatarFromPhoto } from '../lib/generate-avatar'
+import { usePublicSettings } from '../data/settings'
 import Icon from './Icon'
 
 const randomSeed = () => Math.random().toString(36).slice(2, 10)
@@ -20,6 +21,8 @@ export default function AvatarBuilder({
   onClose: () => void
 }) {
   const qc = useQueryClient()
+  const { data: settings } = usePublicSettings()
+  const canAi = isPremium && settings?.features.ai_avatar !== false
   const [config, setConfig] = useState<AvatarConfig>(
     member.avatar_config ?? { style: AVATAR_STYLE, seed: member.id.slice(0, 8), options: {} },
   )
@@ -101,17 +104,19 @@ export default function AvatarBuilder({
             </button>
             {member.photo_url && (
               <button
-                onClick={isPremium ? generateFromPhoto : undefined}
-                disabled={aiBusy || !isPremium}
-                title={isPremium ? 'Match this avatar to the photo' : 'Premium feature'}
+                onClick={canAi ? generateFromPhoto : undefined}
+                disabled={aiBusy || !canAi}
+                title={canAi ? 'Match this avatar to the photo' : 'Premium feature'}
                 className="btn-primary h-10 disabled:opacity-60"
               >
                 <Icon name="crown" className="h-4 w-4" /> {aiBusy ? 'Analyzing…' : 'Generate from photo'}
               </button>
             )}
           </div>
-          {member.photo_url && !isPremium && (
-            <p className="mt-1 text-xs text-ink/45">AI “generate from photo” is a Premium feature.</p>
+          {member.photo_url && !canAi && (
+            <p className="mt-1 text-xs text-ink/45">
+              {isPremium ? 'AI avatars are temporarily unavailable.' : 'AI “generate from photo” is a Premium feature.'}
+            </p>
           )}
         </div>
 

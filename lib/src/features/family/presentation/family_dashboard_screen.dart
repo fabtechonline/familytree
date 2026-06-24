@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../admin/data/admin_repository.dart';
 import '../../../theme/app_theme.dart';
+import '../../settings/app_settings_provider.dart';
 import '../../auth/application/otp_controller.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../members/application/member_providers.dart';
@@ -137,6 +138,7 @@ class FamilyDashboardScreen extends ConsumerWidget {
     }
     final theme = Theme.of(context);
     final isSuper = ref.watch(isSuperAdminProvider).value ?? false;
+    final announcement = ref.watch(publicSettingsProvider).value?.announcement ?? '';
     // Keep a live Realtime subscription open while the dashboard is visible so
     // changes from other relatives appear without a manual refresh.
     ref.watch(familyRealtimeProvider(family.id));
@@ -218,6 +220,24 @@ class FamilyDashboardScreen extends ConsumerWidget {
           padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md,
               AppSpacing.md, 96 + MediaQuery.paddingOf(context).bottom),
           children: [
+            if (announcement.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF4D6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.campaign_rounded, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: Text(announcement,
+                            style: const TextStyle(fontSize: 13))),
+                  ],
+                ),
+              ),
             if (family.myRole.isAdmin) _SuggestionsBanner(familyId: family.id),
             _StatsSection(familyId: family.id),
             const SizedBox(height: AppSpacing.md),

@@ -8,6 +8,7 @@ import '../family/application/family_providers.dart';
 import '../members/application/member_providers.dart';
 import '../members/domain/member.dart';
 import '../members/presentation/widgets/member_avatar.dart';
+import '../settings/app_settings_provider.dart';
 import 'face/face_repository.dart';
 import 'paywall_screen.dart';
 
@@ -99,6 +100,19 @@ class _PointRecognizeScreenState extends ConsumerState<PointRecognizeScreen> {
   @override
   Widget build(BuildContext context) {
     final isPremium = ref.watch(isPremiumProvider);
+    final settings = ref.watch(publicSettingsProvider).value;
+    if (settings != null && !settings.faceRecognition) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Point & Recognize')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('This feature is temporarily unavailable.',
+                textAlign: TextAlign.center),
+          ),
+        ),
+      );
+    }
     if (!isPremium) {
       return const PaywallScreen(
         feature: 'Point & Recognize',
