@@ -29,6 +29,7 @@ const NAV: NavItem[] = [
   { to: '/app/timemachine', label: 'Time machine', icon: 'clock' },
   { to: '/app/capsules', label: 'Capsules', icon: 'capsule' },
   { to: '/app/invite', label: 'Invite & roles', icon: 'invite' },
+  { to: '/app/plans', label: 'Plans & billing', icon: 'crown' },
   { to: '/app/suggestions', label: 'Suggestions', icon: 'inbox', adminOnly: true },
   { to: '/app/admin', label: 'Platform admin', icon: 'shield', superOnly: true },
 ]
