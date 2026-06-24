@@ -154,6 +154,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
   /// for a single person, two for a married couple).
   String? _anchorKey;
   List<String> _anchorIds = const [];
+  String? _anchorLabel;
 
   bool _submitting = false;
   bool _initialized = false;
@@ -323,6 +324,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
     final repo = ref.read(memberRepositoryProvider);
+    final messenger = ScaffoldMessenger.of(context);
 
     // Geocode home/birthplace for the Family Map (best effort). Preserve existing
     // coords unless the place text changed; clear them if the field was emptied.
@@ -378,6 +380,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     );
 
     try {
+      String? warn;
       if (widget.isEditing) {
         // Upload first (member id already exists) so the URL persists with the
         // rest of the edits in a single update.
@@ -397,11 +400,14 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
               familyId: familyId, memberId: created.id, bytes: _pickedBytes!);
           await repo.updateMember(created.copyWith(photoUrl: url));
         }
-        await _createLinkIfNeeded(repo, familyId, created.id);
+        warn = await _createLinkIfNeeded(repo, familyId, created.id);
       }
       invalidateFamilyData(ref, familyId);
       if (!mounted) return;
       context.pop();
+      if (warn != null) {
+        messenger.showSnackBar(SnackBar(content: Text(warn)));
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -441,17 +447,18 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     return options;
   }
 
-  Future<void> _createLinkIfNeeded(
+  Future<String?> _createLinkIfNeeded(
       MemberRepository repo, String familyId, String newId) {
     return _applyLink(repo, familyId, newId, _linkKind, _anchorIds);
   }
 
   /// Applies the relationship described by [kind] between [memberId] and the
   /// selected [anchorIds]. Reused by both the add flow (on save) and the edit
-  /// flow ("Add relationship").
-  Future<void> _applyLink(MemberRepository repo, String familyId,
+  /// flow ("Add relationship"). Returns null on success, or a warning message
+  /// when nothing could be linked (so the caller doesn't show a false success).
+  Future<String?> _applyLink(MemberRepository repo, String familyId,
       String memberId, _LinkKind kind, List<String> anchorIds) async {
-    if (kind == _LinkKind.none || anchorIds.isEmpty) return;
+    if (kind == _LinkKind.none || anchorIds.isEmpty) return null;
 
     switch (kind) {
       // This person is the spouse of the anchor (1:1).
@@ -484,15 +491,119 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
               type: RelType.parent);
         }
       // This person is a sibling of the anchor: share the anchor's parents.
+      // If the anchor has no parents on record, nothing can be derived — offer
+      // to create the shared parent instead of failing silently.
       case _LinkKind.brotherOf:
       case _LinkKind.sisterOf:
-        await repo.linkSiblingByParents(
-            familyId: familyId,
-            newMemberId: memberId,
-            siblingOfId: anchorIds.first);
+        final anchorId = anchorIds.first;
+        final linked = await repo.linkSiblingByParents(
+            familyId: familyId, newMemberId: memberId, siblingOfId: anchorId);
+        if (linked == 0) {
+          final created =
+              await _promptCreateSharedParent(repo, familyId, memberId, anchorId);
+          if (!created) {
+            return 'No sibling link added — siblings must share a parent. '
+                'Add a parent for them first, then try again.';
+          }
+        }
       case _LinkKind.none:
         break;
     }
+    return null;
+  }
+
+  /// Shown when a sibling link can't be derived because the chosen relative has
+  /// no parent on record. Offers to create the shared parent and link both as
+  /// children. Returns true if the parent was created and linked.
+  Future<bool> _promptCreateSharedParent(MemberRepository repo, String familyId,
+      String memberId, String anchorId) async {
+    final firstCtl = TextEditingController();
+    final lastCtl = TextEditingController(text: _lastName.text.trim());
+    var pGender = 'female';
+    var pLiving = false;
+    final anchorName = _anchorLabel ?? 'this person';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Add a shared parent'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Siblings are linked through a shared parent, but $anchorName '
+                  'has no parent on record yet. Add their parent to make them '
+                  'siblings.',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: firstCtl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.words,
+                  decoration:
+                      const InputDecoration(labelText: 'Parent first name'),
+                ),
+                TextField(
+                  controller: lastCtl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration:
+                      const InputDecoration(labelText: 'Last name (optional)'),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text('Parent is:'),
+                    ChoiceChip(
+                      label: const Text('Mother'),
+                      selected: pGender == 'female',
+                      onSelected: (_) => setLocal(() => pGender = 'female'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Father'),
+                      selected: pGender == 'male',
+                      onSelected: (_) => setLocal(() => pGender = 'male'),
+                    ),
+                  ],
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Living'),
+                  value: pLiving,
+                  onChanged: (v) => setLocal(() => pLiving = v),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Add parent & link'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (ok != true || firstCtl.text.trim().isEmpty) return false;
+    await repo.addParentForChildren(
+      familyId: familyId,
+      firstName: firstCtl.text.trim(),
+      lastName: lastCtl.text.trim().isEmpty ? null : lastCtl.text.trim(),
+      gender: pGender,
+      isLiving: pLiving,
+      childIds: [anchorId, memberId],
+    );
+    return true;
   }
 
   /// Adds the currently-selected relationship to an existing member (edit flow).
@@ -500,13 +611,13 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     if (_linkKind == _LinkKind.none || _anchorIds.isEmpty) return;
     setState(() => _submitting = true);
     try {
-      await _applyLink(ref.read(memberRepositoryProvider), familyId,
-          widget.memberId!, _linkKind, _anchorIds);
+      final warn = await _applyLink(ref.read(memberRepositoryProvider),
+          familyId, widget.memberId!, _linkKind, _anchorIds);
       invalidateFamilyData(ref, familyId);
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Relationship added')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(warn ?? 'Relationship added')));
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -597,6 +708,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
     if (_anchorKey == null && anchorOptions.isNotEmpty) {
       _anchorKey = anchorOptions.first.key;
       _anchorIds = anchorOptions.first.memberIds;
+      _anchorLabel = anchorOptions.first.label;
     }
 
     final title = canSelfEdit
@@ -789,6 +901,7 @@ class _MemberEditScreenState extends ConsumerState<MemberEditScreen> {
                 onAnchorChanged: (option) => setState(() {
                   _anchorKey = option.key;
                   _anchorIds = option.memberIds;
+                  _anchorLabel = option.label;
                 }),
               ),
               if (widget.isEditing) ...[

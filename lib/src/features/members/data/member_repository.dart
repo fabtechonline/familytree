@@ -127,9 +127,10 @@ class MemberRepository {
   }
 
   /// Makes [newMemberId] a sibling of [siblingOfId] by giving the new member the
-  /// same parents (siblings are derived from shared parents). If the sibling has
-  /// no recorded parents yet, no edges are created.
-  Future<void> linkSiblingByParents({
+  /// same parents (siblings are derived from shared parents). Returns the number
+  /// of parent edges created — 0 means [siblingOfId] has no recorded parents, so
+  /// no sibling link could be made and the caller should add a shared parent.
+  Future<int> linkSiblingByParents({
     required String familyId,
     required String newMemberId,
     required String siblingOfId,
@@ -141,7 +142,8 @@ class MemberRepository {
         .eq('type', 'parent')
         .eq('to_member', siblingOfId);
 
-    for (final row in rows as List) {
+    final list = rows as List;
+    for (final row in list) {
       await addRelationship(
         familyId: familyId,
         fromMember: row['from_member'] as String,
@@ -149,6 +151,37 @@ class MemberRepository {
         type: RelType.parent,
       );
     }
+    return list.length;
+  }
+
+  /// Creates a parent ([firstName]/[lastName], [gender], [isLiving]) and links
+  /// every id in [childIds] to them as a child. Returns the new parent's id.
+  /// Used to bind siblings who don't yet share a recorded parent.
+  Future<String> addParentForChildren({
+    required String familyId,
+    required String firstName,
+    String? lastName,
+    String? gender,
+    bool isLiving = true,
+    required List<String> childIds,
+  }) async {
+    final parent = await addMember(Member(
+      id: '',
+      familyId: familyId,
+      firstName: firstName,
+      lastName: lastName,
+      gender: gender,
+      isLiving: isLiving,
+    ));
+    for (final childId in childIds) {
+      await addRelationship(
+        familyId: familyId,
+        fromMember: parent.id,
+        toMember: childId,
+        type: RelType.parent,
+      );
+    }
+    return parent.id;
   }
 }
 
