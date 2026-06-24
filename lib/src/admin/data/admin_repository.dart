@@ -68,6 +68,9 @@ class AdminFamily {
     required this.userCount,
     required this.personCount,
     this.createdAt,
+    this.isSuspended = false,
+    this.planKey = 'free',
+    this.isComp = false,
   });
   final String id;
   final String name;
@@ -79,6 +82,9 @@ class AdminFamily {
   /// People in the family tree.
   final int personCount;
   final DateTime? createdAt;
+  final bool isSuspended;
+  final String planKey;
+  final bool isComp;
 
   factory AdminFamily.fromMap(Map<String, dynamic> m) => AdminFamily(
         id: m['id'] as String,
@@ -89,6 +95,9 @@ class AdminFamily {
         createdAt: m['created_at'] == null
             ? null
             : DateTime.tryParse(m['created_at'] as String),
+        isSuspended: m['is_suspended'] as bool? ?? false,
+        planKey: m['plan_key'] as String? ?? 'free',
+        isComp: m['is_comp'] as bool? ?? false,
       );
 }
 
@@ -165,6 +174,31 @@ class AdminRepository {
   Future<void> setSubscription(String familyId, String tier) async {
     await _client.rpc('admin_set_subscription',
         params: {'p_family': familyId, 'p_tier': tier});
+  }
+
+  /// Assign a plan to a family (optionally free/comp, with an optional expiry).
+  Future<void> setFamilyPlan(String familyId, String planKey,
+      {bool comp = false, DateTime? expiresAt}) async {
+    await _client.rpc('admin_set_family_plan', params: {
+      'p_family': familyId,
+      'p_plan_key': planKey,
+      'p_comp': comp,
+      'p_expires_at': expiresAt?.toIso8601String(),
+    });
+  }
+
+  Future<void> suspendFamily(String familyId, bool suspend,
+      {String? reason}) async {
+    await _client.rpc('admin_suspend_family', params: {
+      'p_family': familyId,
+      'p_reason': reason,
+      'p_suspend': suspend,
+    });
+  }
+
+  Future<void> setMemberLimit(String familyId, int? limit) async {
+    await _client.rpc('admin_set_member_limit',
+        params: {'p_family': familyId, 'p_limit': limit});
   }
 
   Future<List<AuditEntry>> audit({int limit = 100}) async {

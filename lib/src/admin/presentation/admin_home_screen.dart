@@ -359,33 +359,162 @@ class _FamiliesSection extends ConsumerWidget {
           separatorBuilder: (_, _) => const SizedBox(height: 8),
           itemBuilder: (context, i) {
             final f = list[i];
-            final isPremium = f.tier == 'premium';
             return Card(
               child: ListTile(
-                title: Text(f.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                    '${f.personCount} ${f.personCount == 1 ? 'person' : 'people'} in tree  ·  '
-                    '${f.userCount} ${f.userCount == 1 ? 'user' : 'users'}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+                title: Row(
                   children: [
-                    Text(isPremium ? 'Premium' : 'Free'),
-                    Switch(
-                      value: isPremium,
-                      onChanged: (v) async {
-                        await ref.read(adminRepositoryProvider).setSubscription(
-                            f.id, v ? 'premium' : 'free');
-                        ref.invalidate(adminFamiliesProvider);
-                        ref.invalidate(adminStatsProvider);
-                      },
-                    ),
+                    Flexible(
+                        child: Text(f.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w700))),
+                    if (f.isSuspended) ...[
+                      const SizedBox(width: 8),
+                      const Chip(
+                          label: Text('Suspended'),
+                          visualDensity: VisualDensity.compact),
+                    ],
                   ],
+                ),
+                subtitle: Text(
+                    '${f.personCount} people  ·  ${f.userCount} users  ·  '
+                    '${f.planKey.replaceAll('_', ' ')}${f.isComp ? ' (comp)' : ''}'),
+                trailing: FilledButton.tonalIcon(
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: const Text('Manage'),
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    showDragHandle: true,
+                    builder: (_) => _FamilyManageSheet(family: f),
+                  ),
                 ),
               ),
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _FamilyManageSheet extends ConsumerStatefulWidget {
+  const _FamilyManageSheet({required this.family});
+  final AdminFamily family;
+
+  @override
+  ConsumerState<_FamilyManageSheet> createState() => _FamilyManageSheetState();
+}
+
+class _FamilyManageSheetState extends ConsumerState<_FamilyManageSheet> {
+  late String _plan = widget.family.planKey;
+  late bool _comp = widget.family.isComp;
+  final _limit = TextEditingController();
+  bool _busy = false;
+
+  static const _plans = ['free', 'premium_monthly', 'premium_yearly', 'lifetime'];
+
+  @override
+  void dispose() {
+    _limit.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run(
+      Future<void> Function(AdminRepository) action, String ok) async {
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await action(ref.read(adminRepositoryProvider));
+      ref.invalidate(adminFamiliesProvider);
+      ref.invalidate(adminStatsProvider);
+      navigator.pop();
+      messenger.showSnackBar(SnackBar(content: Text(ok)));
+    } catch (e) {
+      if (mounted) setState(() => _busy = false);
+      messenger.showSnackBar(SnackBar(content: Text('Failed: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final f = widget.family;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(f.name,
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 16),
+          const Text('Plan', style: TextStyle(fontWeight: FontWeight.w600)),
+          DropdownButton<String>(
+            isExpanded: true,
+            value: _plan,
+            items: [
+              for (final p in _plans)
+                DropdownMenuItem(value: p, child: Text(p.replaceAll('_', ' '))),
+            ],
+            onChanged: _busy ? null : (v) => setState(() => _plan = v ?? _plan),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Free / comp (grant at no charge)'),
+            value: _comp,
+            onChanged: _busy ? null : (v) => setState(() => _comp = v ?? false),
+          ),
+          FilledButton(
+            onPressed: _busy
+                ? null
+                : () => _run((r) => r.setFamilyPlan(f.id, _plan, comp: _comp),
+                    'Plan updated'),
+            child: const Text('Apply plan'),
+          ),
+          const Divider(height: 32),
+          Row(
+            children: [
+              const Expanded(
+                  child: Text('Free-tier member limit (blank = default)')),
+              SizedBox(
+                width: 96,
+                child: TextField(
+                  controller: _limit,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                      border: OutlineInputBorder(), isDense: true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(
+            onPressed: _busy
+                ? null
+                : () => _run(
+                    (r) => r.setMemberLimit(
+                        f.id,
+                        _limit.text.trim().isEmpty
+                            ? null
+                            : int.tryParse(_limit.text.trim())),
+                    'Member limit saved'),
+            child: const Text('Save limit'),
+          ),
+          const Divider(height: 32),
+          FilledButton.tonal(
+            style: FilledButton.styleFrom(
+                foregroundColor:
+                    f.isSuspended ? null : theme.colorScheme.error),
+            onPressed: _busy
+                ? null
+                : () => _run((r) => r.suspendFamily(f.id, !f.isSuspended),
+                    f.isSuspended ? 'Family unsuspended' : 'Family suspended'),
+            child: Text(f.isSuspended ? 'Unsuspend access' : 'Suspend access'),
+          ),
+        ],
       ),
     );
   }
