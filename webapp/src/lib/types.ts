@@ -39,6 +39,9 @@ export interface Family {
   subscription_tier: SubscriptionTier
   settings: { face_recognition?: boolean; [k: string]: unknown }
   created_at: string
+  is_suspended?: boolean
+  suspended_reason?: string | null
+  member_limit?: number | null
 }
 
 /** Illustrated avatar config (DiceBear). Stored in members.avatar_config. */

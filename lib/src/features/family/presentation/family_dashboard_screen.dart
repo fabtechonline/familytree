@@ -102,6 +102,39 @@ class FamilyDashboardScreen extends ConsumerWidget {
     if (family == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    if (family.isSuspended) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_person_rounded,
+                    size: 56, color: Theme.of(context).colorScheme.error),
+                const SizedBox(height: 16),
+                Text('Family access suspended',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text(
+                    'Access to ${family.name} has been suspended by the Riza '
+                    'team. Please contact support if you believe this is a mistake.',
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                OutlinedButton(
+                  onPressed: () => ref.read(authRepositoryProvider).signOut(),
+                  child: const Text('Sign out'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final theme = Theme.of(context);
     final isSuper = ref.watch(isSuperAdminProvider).value ?? false;
     // Keep a live Realtime subscription open while the dashboard is visible so

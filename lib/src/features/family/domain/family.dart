@@ -49,6 +49,7 @@ class Family {
     required this.createdAt,
     this.settings = const {},
     this.myRole = FamilyRole.viewer,
+    this.isSuspended = false,
   });
 
   final String id;
@@ -58,6 +59,7 @@ class Family {
   final DateTime createdAt;
   final Map<String, dynamic> settings;
   final FamilyRole myRole;
+  final bool isSuspended;
 
   /// Opt-in flag for the Point & Recognize face feature.
   bool get faceRecognitionEnabled => settings['face_recognition'] == true;
@@ -72,6 +74,7 @@ class Family {
       createdAt: DateTime.parse(map['created_at'] as String),
       settings: (map['settings'] as Map?)?.cast<String, dynamic>() ?? const {},
       myRole: role ?? FamilyRole.fromName(map['my_role'] as String?),
+      isSuspended: map['is_suspended'] as bool? ?? false,
     );
   }
 }
