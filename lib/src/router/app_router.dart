@@ -19,6 +19,7 @@ import '../features/celebrations/presentation/celebrations_screen.dart';
 import '../features/capsules/capsules_screen.dart';
 import '../features/insights/insights_screen.dart';
 import '../features/premium/point_recognize_screen.dart';
+import '../features/premium/plans_billing_screen.dart';
 import '../features/relate/relate_screen.dart';
 import '../features/timemachine/time_machine_screen.dart';
 import '../features/members/presentation/member_edit_screen.dart';
@@ -147,6 +148,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/about',
         builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: '/plans-billing',
+        builder: (context, state) => const PlansBillingScreen(),
       ),
       GoRoute(
         path: '/admin',

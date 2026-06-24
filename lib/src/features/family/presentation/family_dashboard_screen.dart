@@ -172,6 +172,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
                   context.push('/suggestions');
                 case 'set-password':
                   _setPasswordDialog(context, ref);
+                case 'plans':
+                  context.push('/plans-billing');
                 case 'about':
                   context.push('/about');
                 case 'admin':
@@ -192,6 +194,8 @@ class FamilyDashboardScreen extends ConsumerWidget {
               const PopupMenuItem(value: 'new-family', child: Text('New family')),
               const PopupMenuItem(
                   value: 'set-password', child: Text('Set / change password')),
+              const PopupMenuItem(
+                  value: 'plans', child: Text('Plans & billing')),
               const PopupMenuItem(value: 'about', child: Text('About')),
               if (isSuper)
                 const PopupMenuItem(
